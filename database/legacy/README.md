@@ -1,5 +1,14 @@
 # Earlier database design
 
+**Which database is which** (checked 4 Oct 2026 with `tools/which-database-is-newer.sql`):
+
+| Database | Design | Created | Last changed |
+|---|---|---|---|
+| `BME_db` | **Redesign**: 50 `tbl_*` tables, 112 `usp_*` procedures. The live one. | 8 Sep 2026 | 19 Sep 2026 (`usp_Subscription_MarkBilled`) |
+| `BillingMadeEasy` | Earlier design (`Organizations`, `sp_*`). Reference only. | 13 Aug 2026 | 7 Sep 2026 |
+
+`BME_db` was created the day the redesign chat started and last changed the day it ended.
+
 `BME-schema-2026-10-04.sql` is the schema of the `BillingMadeEasy` database as scripted from
 SSMS on 4 Oct 2026: 63 tables (`Organizations`, `Users`, `Invoices`, …) and 14 `sp_*`
 procedures. **Schema only**: the data rows were removed before committing because they held
