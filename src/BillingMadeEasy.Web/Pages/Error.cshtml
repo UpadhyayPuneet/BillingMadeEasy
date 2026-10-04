@@ -1,0 +1,13 @@
+@page
+@model ErrorModel
+@{
+    ViewData["Title"] = "Something went wrong";
+    Layout = "_AuthLayout";
+}
+<h1>Something went wrong</h1>
+<p class="muted">It's been logged. Try again, and if it keeps happening, quote this reference.</p>
+@if (Model.ShowRequestId)
+{
+    <p><code>@Model.RequestId</code></p>
+}
+<a class="btn primary block" href="/">Back to home</a>

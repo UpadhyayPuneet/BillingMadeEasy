@@ -1,0 +1,40 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home";
+}
+<section class="hero">
+    <h1>@Model.Greeting@(string.IsNullOrEmpty(Model.FirstName) ? "" : ", " + Model.FirstName)</h1>
+    <p class="muted">Press <kbd>Ctrl</kbd> <kbd>K</kbd> to go anywhere, or <kbd>?</kbd> to see every shortcut.</p>
+</section>
+
+<section class="grid">
+    @foreach (var item in Model.Shortcuts)
+    {
+        <a class="tile" href="@item.Href">
+            <span class="ms tile-icon" aria-hidden="true">@item.Icon</span>
+            <span class="tile-title">@item.Title</span>
+            @if (item.Shortcut is not null) { <kbd class="tile-key">g @item.Shortcut</kbd> }
+        </a>
+    }
+</section>
+
+<section class="card">
+    <header class="card-head">
+        <h2>Switched on for this business</h2>
+        <a href="/Plan" class="link">Plan &amp; modules</a>
+    </header>
+    @if (Model.Modules.Count == 0)
+    {
+        <p class="muted">Only the essentials so far. Add a module from your plan page.</p>
+    }
+    else
+    {
+        <ul class="chips">
+            @foreach (var module in Model.Modules)
+            {
+                <li class="chip"><span class="ms" aria-hidden="true">@module.Icon</span>@module.Name</li>
+            }
+        </ul>
+    }
+</section>

@@ -1,0 +1,102 @@
+@using System.Text.Json
+@inject NavigationService Navigation
+@{
+    var nav = await Navigation.ForAsync(User);
+    string tenantName = User.FindFirst(AppClaims.TenantName)?.Value ?? "";
+    string scope = $"{User.GetTenantId()}:{User.GetUserId()}";
+    var commands = nav.Select(n => new { title = n.Title, href = n.Href, icon = n.Icon, group = n.Group, keywords = n.Keywords, shortcut = n.Shortcut });
+    string path = Context.Request.Path.Value ?? "/";
+}
+<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] · Billing Made Easy</title>
+    <script src="~/js/theme.js" asp-append-version="true"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" />
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/shell.css" asp-append-version="true" />
+    @await RenderSectionAsync("Head", required: false)
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="topbar">
+        <a class="brand" href="/" aria-label="Home">
+            <span class="brand-mark" aria-hidden="true">B</span>
+            <span class="brand-name">@(string.IsNullOrEmpty(tenantName) ? "Billing Made Easy" : tenantName)</span>
+        </a>
+        <nav class="topnav" aria-label="Main">
+            @foreach (var item in nav.Where(n => n.Group == "Go to"))
+            {
+                bool active = item.Href == "/" ? path == "/" : path.StartsWith(item.Href, StringComparison.OrdinalIgnoreCase);
+                <a href="@item.Href" class="@(active ? "active" : null)" aria-current="@(active ? "page" : null)">
+                    <span class="ms" aria-hidden="true">@item.Icon</span>@item.Title
+                    @if (item.Shortcut is not null) { <kbd class="hint">g @item.Shortcut</kbd> }
+                </a>
+            }
+        </nav>
+        <button type="button" class="search-trigger" data-palette-open aria-keyshortcuts="Control+K">
+            <span class="ms" aria-hidden="true">search</span>
+            <span>Search or type a command</span>
+            <kbd>Ctrl K</kbd>
+        </button>
+        <div class="topbar-actions">
+            <button type="button" class="icon-btn" data-voice title="Speak a command (Ctrl+Shift+Space)" aria-label="Speak a command">
+                <span class="ms" aria-hidden="true">mic</span>
+            </button>
+            <button type="button" class="icon-btn" data-theme-toggle title="Switch theme" aria-label="Switch theme">
+                <span class="ms" aria-hidden="true">contrast</span>
+            </button>
+            <button type="button" class="icon-btn" data-help title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">
+                <span class="ms" aria-hidden="true">keyboard</span>
+            </button>
+            <form method="post" asp-page="/Account/SignOut" class="inline">
+                <button type="submit" class="icon-btn" title="Sign out" aria-label="Sign out"><span class="ms" aria-hidden="true">logout</span></button>
+            </form>
+        </div>
+    </header>
+
+    <main id="main" class="page">
+        @RenderBody()
+    </main>
+
+    <div class="palette" data-palette hidden role="dialog" aria-modal="true" aria-label="Command bar">
+        <div class="palette-box">
+            <div class="palette-input">
+                <span class="ms" aria-hidden="true">search</span>
+                <input type="text" data-palette-input placeholder="Go to, find, or create…" autocomplete="off" spellcheck="false"
+                       role="combobox" aria-expanded="true" aria-controls="palette-list" aria-autocomplete="list" />
+                <button type="button" class="icon-btn" data-voice aria-label="Speak"><span class="ms" aria-hidden="true">mic</span></button>
+            </div>
+            <ul id="palette-list" class="palette-list" data-palette-list role="listbox"></ul>
+            <footer class="palette-foot"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span><kbd>Esc</kbd> close</span></footer>
+        </div>
+    </div>
+
+    <div class="sheet" data-help-sheet hidden role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+        <div class="sheet-box">
+            <h2>Keyboard shortcuts</h2>
+            <dl class="keys">
+                <dt><kbd>Ctrl</kbd> <kbd>K</kbd> or <kbd>/</kbd></dt><dd>Command bar: go anywhere, find anything</dd>
+                <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Space</kbd></dt><dd>Speak a command</dd>
+                @foreach (var item in nav.Where(n => n.Shortcut is not null))
+                {
+                    <dt><kbd>g</kbd> then <kbd>@item.Shortcut</kbd></dt><dd>@item.Title</dd>
+                }
+                <dt><kbd>?</kbd></dt><dd>This list</dd>
+                <dt><kbd>Esc</kbd></dt><dd>Close whatever is open</dd>
+            </dl>
+            <p class="muted">Every screen adds its own keys here.</p>
+        </div>
+    </div>
+
+    <script type="application/json" id="bme-commands">@Html.Raw(JsonSerializer.Serialize(commands))</script>
+    <script type="application/json" id="bme-scope">@Html.Raw(JsonSerializer.Serialize(scope))</script>
+    <script src="~/js/keys.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

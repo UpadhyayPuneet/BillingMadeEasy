@@ -1,0 +1,70 @@
+@page
+@model PlanModel
+@using BillingMadeEasy.Core.Modules
+@{
+    ViewData["Title"] = "Plan & modules";
+}
+<header class="page-head">
+    <div>
+        <h1>Plan &amp; modules</h1>
+        <p class="muted">Every module works on its own. Switch on only what this business needs; they connect automatically when both sides are on.</p>
+    </div>
+    <span class="badge">Plan: @Model.PlanCode</span>
+</header>
+
+@if (Model.Needed is { } needed)
+{
+    <div class="notice" role="status">
+        <strong>@needed.Name</strong> isn't switched on for this business, so that page is unavailable. It's listed below.
+    </div>
+}
+
+<section class="modules">
+    @foreach (var row in Model.Rows)
+    {
+        var m = row.Module;
+        bool highlighted = string.Equals(m.Key, Model.Need, StringComparison.OrdinalIgnoreCase);
+        <article class="module @(row.Enabled ? "on" : null) @(highlighted ? "highlight" : null)" id="module-@m.Key">
+            <span class="ms module-icon" aria-hidden="true">@m.Icon</span>
+            <div class="module-body">
+                <h2>@m.Name</h2>
+                <p class="muted">@m.Summary</p>
+                @if (m.Requires.Count > 0)
+                {
+                    <p class="small">Needs: @string.Join(", ", m.Requires.Select(r => ModuleCatalog.Find(r)!.Name))</p>
+                }
+                @if (m.Enhances.Count > 0)
+                {
+                    <p class="small muted">Works with: @string.Join(", ", m.Enhances.Select(r => ModuleCatalog.Find(r)!.Name))</p>
+                }
+            </div>
+            <div class="module-state">
+                @if (row.Enabled)
+                {
+                    <span class="badge success">On</span>
+                    <span class="small muted">@(row.Source switch
+                    {
+                        EntitlementSource.Plan => "Included in plan",
+                        EntitlementSource.AddOn => "Add-on",
+                        EntitlementSource.PlatformGrant => "Granted by support",
+                        EntitlementSource.Trial => row.ExpiresAt is { } e ? $"Trial until {e:dd MMM}" : "Trial",
+                        _ => "",
+                    })</span>
+                }
+                else if (!m.IsAvailable)
+                {
+                    <span class="badge">Coming soon</span>
+                }
+                else
+                {
+                    <span class="badge">Off</span>
+                    @if (row.Missing.Count > 0)
+                    {
+                        <span class="small muted">Switch on @string.Join(", ", row.Missing.Select(r => ModuleCatalog.Find(r)!.Name)) first</span>
+                    }
+                    <span class="small muted">Self-serve add-on arrives with platform billing.</span>
+                }
+            </div>
+        </article>
+    }
+</section>

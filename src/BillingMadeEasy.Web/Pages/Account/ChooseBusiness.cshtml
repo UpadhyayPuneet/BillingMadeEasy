@@ -1,0 +1,30 @@
+@page
+@model BillingMadeEasy.Web.Pages.Account.ChooseBusinessModel
+@{
+    ViewData["Title"] = "Choose a business";
+    Layout = "_AuthLayout";
+    int index = 0;
+}
+<h1>Choose a business</h1>
+<p class="muted">You can switch any time from the command bar. Press a number to pick.</p>
+
+@if (Model.Tenants.Count == 0)
+{
+    <div class="notice">You're not part of any business yet. Ask an owner to invite you.</div>
+}
+
+<form method="post" class="choices" data-number-keys>
+    <input type="hidden" asp-for="ReturnUrl" />
+    @foreach (var tenant in Model.Tenants)
+    {
+        index++;
+        <button type="submit" name="tenantId" value="@tenant.TenantId" class="choice" data-key="@index"
+                aria-current="@(tenant.TenantId == Model.CurrentTenantId ? "true" : null)">
+            <kbd>@index</kbd>
+            <span class="choice-name">@tenant.TenantName</span>
+            <span class="choice-meta">@tenant.RoleName</span>
+            <span class="ms" aria-hidden="true">chevron_right</span>
+        </button>
+    }
+</form>
+<script src="~/js/choose.js" asp-append-version="true"></script>

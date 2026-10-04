@@ -1,0 +1,36 @@
+@page
+@model BillingMadeEasy.Web.Pages.Account.SignInModel
+@{
+    ViewData["Title"] = "Sign in";
+    Layout = "_AuthLayout";
+}
+<h1>Sign in</h1>
+<p class="muted">Welcome back.</p>
+
+@if (Model.Error is not null)
+{
+    <div class="notice danger" role="alert">@Model.Error</div>
+}
+
+<form method="post" class="form" novalidate>
+    <input type="hidden" asp-for="ReturnUrl" />
+    <label class="field">
+        <span>Email or mobile</span>
+        <input asp-for="Identifier" autocomplete="username" autofocus inputmode="email" />
+        <span asp-validation-for="Identifier" class="field-error"></span>
+    </label>
+    <label class="field">
+        <span>Password</span>
+        <input asp-for="Password" autocomplete="current-password" />
+        <span asp-validation-for="Password" class="field-error"></span>
+    </label>
+    <label class="check">
+        <input asp-for="Remember" /> <span>Keep me signed in on this device</span>
+    </label>
+    <button type="submit" class="btn primary block">Sign in <kbd>Enter</kbd></button>
+</form>
+
+@if (Model.ShowDemoHint)
+{
+    <p class="muted small demo-hint">Development demo: <code>@BillingMadeEasy.Web.Infrastructure.Demo.DemoData.Email</code> / <code>@BillingMadeEasy.Web.Infrastructure.Demo.DemoData.Password</code></p>
+}

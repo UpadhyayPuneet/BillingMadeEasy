@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BillingMadeEasy.Core/BillingMadeEasy.Core.csproj" />
+    <Project Path="src/BillingMadeEasy.Data/BillingMadeEasy.Data.csproj" />
+    <Project Path="src/BillingMadeEasy.Web/BillingMadeEasy.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BillingMadeEasy.Tests/BillingMadeEasy.Tests.csproj" />
+  </Folder>
+</Solution>

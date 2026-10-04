@@ -1,0 +1,22 @@
+@page
+@{
+    ViewData["Title"] = "GSTIN check";
+}
+<header class="page-head">
+    <div>
+        <h1>GSTIN check</h1>
+        <p class="muted">Checks the format and checksum as you type, and tells you the state, which decides CGST + SGST or IGST.</p>
+    </div>
+</header>
+
+<section class="card narrow">
+    <label class="field">
+        <span>GSTIN</span>
+        <input id="gstin" class="mono" maxlength="20" autocomplete="off" spellcheck="false" autofocus placeholder="27AAPFU0939F1ZV" />
+    </label>
+    <output id="gstin-result" class="result" aria-live="polite"></output>
+</section>
+
+@section Scripts {
+    <script src="~/js/gstin.js" asp-append-version="true"></script>
+}

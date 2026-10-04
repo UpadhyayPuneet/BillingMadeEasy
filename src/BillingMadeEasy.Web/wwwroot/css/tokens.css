@@ -1,0 +1,82 @@
+/* Design tokens. Everything reads these variables; swap them to restyle the app.
+   Replace with the tokens.css from the Web Forms project once it's in the repo. */
+:root {
+    --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #f1f3f6;
+    --border: #e3e6eb;
+    --text: #14171c;
+    --text-2: #5b6370;
+    --accent: #2563eb;
+    --accent-ink: #ffffff;
+    --accent-soft: #e8efff;
+    --success: #12805c;
+    --success-soft: #e3f5ee;
+    --danger: #c62828;
+    --danger-soft: #fdecec;
+    --warning: #a35b00;
+    --warning-soft: #fff3e0;
+    --focus: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+    --shadow-1: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 8%);
+    --shadow-3: 0 20px 48px rgb(16 24 40 / 18%);
+
+    --radius-s: 8px;
+    --radius-m: 12px;
+    --radius-l: 16px;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --topbar-h: 56px;
+
+    color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #0e1116;
+        --surface: #161a21;
+        --surface-2: #1d222b;
+        --border: #2a303b;
+        --text: #e8ebf0;
+        --text-2: #9aa3b2;
+        --accent: #6c9bff;
+        --accent-ink: #0b1020;
+        --accent-soft: #1b2741;
+        --success: #3ecf98;
+        --success-soft: #11291f;
+        --danger: #ff7a7a;
+        --danger-soft: #331717;
+        --warning: #ffb547;
+        --warning-soft: #33250f;
+        --shadow-1: 0 1px 2px rgb(0 0 0 / 40%);
+        --shadow-3: 0 20px 48px rgb(0 0 0 / 55%);
+        color-scheme: dark;
+    }
+}
+
+:root[data-theme="dark"] {
+    --bg: #0e1116;
+    --surface: #161a21;
+    --surface-2: #1d222b;
+    --border: #2a303b;
+    --text: #e8ebf0;
+    --text-2: #9aa3b2;
+    --accent: #6c9bff;
+    --accent-ink: #0b1020;
+    --accent-soft: #1b2741;
+    --success: #3ecf98;
+    --success-soft: #11291f;
+    --danger: #ff7a7a;
+    --danger-soft: #331717;
+    --warning: #ffb547;
+    --warning-soft: #33250f;
+    --shadow-1: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow-3: 0 20px 48px rgb(0 0 0 / 55%);
+    color-scheme: dark;
+}
