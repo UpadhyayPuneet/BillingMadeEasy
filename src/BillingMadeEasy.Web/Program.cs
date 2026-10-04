@@ -48,6 +48,8 @@ services.AddScoped<BillingMadeEasy.Web.Features.Parties.PartyStore>();
 services.AddScoped<BillingMadeEasy.Web.Features.Team.TeamStore>();
 services.AddScoped<BillingMadeEasy.Web.Features.Team.InviteSender>();
 services.AddScoped<AccountTokens>();
+services.AddSingleton(builder.Configuration.GetSection("Storage").Get<BillingMadeEasy.Web.Infrastructure.Files.StorageOptions>() ?? new());
+services.AddSingleton<BillingMadeEasy.Web.Infrastructure.Files.FileStore>();
 services.AddScoped<BillingMadeEasy.Web.Features.Account.PasswordService>();
 services.AddScoped<BillingMadeEasy.Web.Infrastructure.Settings.SettingsReader>();
 services.AddScoped<BillingMadeEasy.Web.Infrastructure.Email.EmailService>();
@@ -146,6 +148,7 @@ app.UseAuthorization();
 
 app.MapHealthChecks("/health").AllowAnonymous();
 app.MapRazorPages();
+BillingMadeEasy.Web.Infrastructure.Files.FileStore.MapFiles(app);
 
 var api = app.MapGroup("/api").RequireAuthorization();
 foreach (var module in app.Services.GetServices<IAppModule>())

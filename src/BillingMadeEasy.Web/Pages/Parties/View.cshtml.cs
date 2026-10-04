@@ -156,6 +156,12 @@ public sealed class ViewModel(PartyStore parties) : TenantPageModel
             TenantId, PartyId = Id, input.PartyBrandId, input.BrandName, BrandCode = Blank(input.BrandCode),
             Description = Blank(input.Description), ColorPalette = (string?)null, ActionByUserId = UserId, IpAddress,
         }, ct);
+        // A new brand opens on its kit, where the logo and colours go.
+        if (result.Succeeded && input.PartyBrandId == 0)
+        {
+            Flash = $"Added {input.BrandName}. Add the logo and colours below.";
+            return RedirectToPage("/Parties/Brand", new { partyId = Id, brandId = result.PartyBrandId });
+        }
         return await FinishAsync(result, "brand", "Brand saved.", () => Brand = input, ct);
     }
 

@@ -22,6 +22,7 @@ public sealed class SqlAppFactory(SqlDatabaseFixture db, string? mailDir = null)
         builder.UseSetting("ConnectionStrings:BillingMadeEasy", db.ConnectionString);
         builder.UseSetting("Email:Mode", mailDir is null ? "Disabled" : "Pickup");   // Disabled: invites fall back to the share link
         if (mailDir is not null) builder.UseSetting("Email:PickupDirectory", mailDir);
+        builder.UseSetting("Storage:Root", Path.Combine(Path.GetTempPath(), "bme-test-files"));
     }
 }
 

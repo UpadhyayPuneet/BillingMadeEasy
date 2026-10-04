@@ -73,6 +73,7 @@ docs/
 | `Email:Host`, `Port`, `UserName`, `Password`, `UseStartTls` | — | SMTP server (Office 365: `smtp.office365.com`, 587) |
 | `Email:FromAddress`, `FromName` | — | Sender shown on every email |
 | `Email:PublicBaseUrl` | request host | Address used in email links, e.g. `https://app.example.in` |
+| `Storage:Root` | `App_Data/files` | Uploaded files (logos). Served only to the business that owns them; back this folder up with the database |
 
 Keep real connection strings and SMTP passwords out of the repository: use
 `dotnet user-secrets` locally and environment variables on the server, e.g.
@@ -96,3 +97,4 @@ so running one again does no harm.
 | `30_module_entitlements.sql` | Plans, add-ons, trials, limits |
 | `31_session_lock.sql` | Server-side screen lock |
 | `32_party_find_by_gstin.sql` | Duplicate-GSTIN check for new parties |
+| `33_party_brand_kit.sql` | Brand kit: dark-background logo, named colours, fonts, tagline, social handles, guidelines |

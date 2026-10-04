@@ -16,6 +16,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Sql/test-logo.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 

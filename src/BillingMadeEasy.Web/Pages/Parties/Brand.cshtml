@@ -1,0 +1,221 @@
+@page "/Parties/{partyId:long}/Brand/{brandId:long}"
+@model BillingMadeEasy.Web.Pages.Parties.BrandModel
+@using BillingMadeEasy.Web.Infrastructure.Files
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{
+    var k = Model.Kit;
+    ViewData["Title"] = k.BrandName;
+    bool editing = Model.Editing;
+    var fonts = new[] { k.FontHeading, k.FontBody }.Where(f => !string.IsNullOrWhiteSpace(f)).Distinct().ToList();
+}
+@section Head {
+    @* Preview the brand's fonts when they're on Google Fonts; nothing breaks if they aren't. *@
+    @foreach (var f in fonts)
+    {
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=@Uri.EscapeDataString(f!)&display=swap" />
+    }
+}
+<header class="page-head">
+    <div class="brand-head">
+        @if (k.LogoPath is not null) { <img class="brand-mark-img" src="@FileStore.Url(k.LogoPath)" alt="@k.BrandName logo" /> }
+        <div>
+            <a class="back" href="/Parties/View/@k.PartyId"><span class="ms" aria-hidden="true">arrow_back</span>@k.PartyName</a>
+            <h1>@k.BrandName @if (k.BrandCode is not null) { <span class="badge mono">@k.BrandCode</span> }</h1>
+            @if (k.Tagline is not null) { <p class="tagline">“@k.Tagline”</p> }
+            @if (k.Description is not null) { <p class="muted">@k.Description</p> }
+            <p class="muted small">Brand kit · updated @When.Ago(k.UpdatedAtUtc, "never")</p>
+        </div>
+    </div>
+    @if (Model.CanEdit && !editing)
+    {
+        <a class="btn" href="#kit-form" data-key="e" data-show="#kit-form" data-hide="#kit-view"><span class="ms" aria-hidden="true">edit</span>Edit brand kit <kbd>E</kbd></a>
+    }
+</header>
+
+@if (Model.Flash is not null) { <div class="notice" role="status">@Model.Flash</div> }
+
+@* ── Logos: uploaded straight away, independent of the kit form ── *@
+<section class="card section">
+    <header class="card-head"><h2>Logo</h2></header>
+    <p class="muted small">Upload the master files once. Everyone on the team uses the same, current version.</p>
+    <div class="logo-grid">
+        @foreach (var (variant, path, label, dark) in new[] { ((byte)1, k.LogoPath, "For light backgrounds", false), ((byte)2, k.LogoDarkPath, "For dark backgrounds", true) })
+        {
+            <figure class="logo-tile @(dark ? "dark" : null)">
+                @if (path is not null)
+                {
+                    <img src="@FileStore.Url(path)" alt="@k.BrandName logo, @label.ToLowerInvariant()" data-logo />
+                }
+                else
+                {
+                    <span class="logo-empty"><span class="ms" aria-hidden="true">image</span>No file yet</span>
+                }
+                <figcaption>
+                    <span>@label</span>
+                    @if (path is not null) { <a href="@FileStore.Url(path)" download class="link">Download</a> }
+                </figcaption>
+                @if (Model.CanEdit)
+                {
+                    <form method="post" asp-page-handler="Logo" enctype="multipart/form-data" class="logo-upload" data-upload>
+                        <input type="hidden" name="variant" value="@variant" />
+                        <label class="btn small">
+                            <span class="ms" aria-hidden="true">upload</span>@(path is null ? "Upload" : "Replace")
+                            <input type="file" name="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden />
+                        </label>
+                    </form>
+                    @if (path is not null)
+                    {
+                        <form method="post" asp-page-handler="RemoveLogo" data-confirm="Remove this logo?">
+                            <input type="hidden" name="variant" value="@variant" />
+                            <button type="submit" class="btn small">Remove</button>
+                        </form>
+                    }
+                }
+            </figure>
+        }
+    </div>
+    <p class="muted small">PNG, JPG, WebP or SVG, up to 2 MB. Drop a file on a tile to upload it.</p>
+</section>
+
+<div id="kit-view" hidden="@editing">
+    <section class="card section">
+        <header class="card-head"><h2>Colours <span class="count">@Model.Colors.Count</span></h2></header>
+        @if (Model.Colors.Count == 0)
+        {
+            <p class="empty-inline">No colours yet. @(Model.CanEdit && k.LogoPath is not null ? "Edit the kit and use “Suggest from logo”." : "")</p>
+        }
+        else
+        {
+            <p class="muted small">Click a code to copy it. The sample shows which text colour stays readable on it.</p>
+            <ul class="swatches">
+                @foreach (var c in Model.Colors)
+                {
+                    var (text, ratio) = c.ReadableText;
+                    <li class="swatch">
+                        <span class="swatch-chip" data-bg="@c.Hex" data-fg="@text">
+                            <span class="swatch-sample">Aa</span>
+                            <span class="swatch-ratio" title="Contrast ratio with @(text == "#FFFFFF" ? "white" : "black") text">@ratio.ToString("0.0"):1 @(ratio >= 4.5 ? "✓" : "large text only")</span>
+                        </span>
+                        <span class="swatch-name">@c.Name</span>
+                        <button type="button" class="swatch-code mono" data-copy="@c.Hex" title="Copy">@c.Hex</button>
+                        <button type="button" class="swatch-code mono muted" data-copy="rgb(@c.Rgb)" title="Copy">RGB @c.Rgb</button>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+
+    <section class="summary-grid">
+        <article class="card stat">
+            <h2>Type</h2>
+            @if (fonts.Count == 0) { <p class="empty-inline">No fonts recorded.</p> }
+            else
+            {
+                <dl class="facts">
+                    @if (k.FontHeading is not null) { <dt>Headings</dt><dd data-font="@k.FontHeading" class="font-sample">@k.FontHeading</dd> }
+                    @if (k.FontBody is not null) { <dt>Body</dt><dd data-font="@k.FontBody" class="font-sample">@k.FontBody</dd> }
+                </dl>
+            }
+        </article>
+        <article class="card stat">
+            <h2>Online</h2>
+            @{
+                var links = new (string Label, string? Url)[]
+                {
+                    ("Website", BillingMadeEasy.Web.Pages.Parties.BrandModel.WebUrl(k.Website)),
+                    ("Instagram", BillingMadeEasy.Web.Pages.Parties.BrandModel.SocialUrl(k.Instagram, "instagram.com")),
+                    ("Facebook", BillingMadeEasy.Web.Pages.Parties.BrandModel.SocialUrl(k.Facebook, "facebook.com")),
+                    ("LinkedIn", BillingMadeEasy.Web.Pages.Parties.BrandModel.SocialUrl(k.LinkedIn, "linkedin.com/company")),
+                    ("YouTube", BillingMadeEasy.Web.Pages.Parties.BrandModel.SocialUrl(k.YouTube, "youtube.com")),
+                }.Where(l => l.Url is not null).ToList();
+            }
+            @if (links.Count == 0) { <p class="empty-inline">No website or social accounts recorded.</p> }
+            else
+            {
+                <dl class="facts">
+                    @foreach (var l in links) { <dt>@l.Label</dt><dd><a href="@l.Url" target="_blank" rel="noopener noreferrer">@(new Uri(l.Url!).Host + new Uri(l.Url!).AbsolutePath.TrimEnd('/'))</a></dd> }
+                </dl>
+            }
+        </article>
+    </section>
+
+    <section class="card section">
+        <header class="card-head"><h2>Do's and don'ts</h2></header>
+        @if (k.Guidelines is null) { <p class="empty-inline">Nothing recorded. Note the client's rules here so nobody has to relearn them.</p> }
+        else { <p class="guidelines">@k.Guidelines</p> }
+    </section>
+</div>
+
+@if (Model.CanEdit)
+{
+    <form method="post" asp-page-handler="Kit" id="kit-form" class="sheet-form wide" data-form novalidate autocomplete="off" hidden="@(!editing)">
+        <div asp-validation-summary="ModelOnly" class="notice danger" role="alert"></div>
+
+        <section class="form-card">
+            <header class="card-head">
+                <h2>Colours</h2>
+                <div class="actions">
+                    @if (k.LogoPath is not null) { <button type="button" class="btn small" data-suggest-colors="@FileStore.Url(k.LogoPath)"><span class="ms" aria-hidden="true">auto_awesome</span>Suggest from logo</button> }
+                    <button type="button" class="btn small" data-add-color><span class="ms" aria-hidden="true">add</span>Add colour</button>
+                </div>
+            </header>
+            <p class="muted small">Name them by role (Primary, Accent, Background) so people know when to use each.</p>
+            <div class="color-rows" data-color-rows>
+                @for (int i = 0; i < Math.Max(1, Model.Form.Colors.Count); i++)
+                {
+                    var c = i < Model.Form.Colors.Count ? Model.Form.Colors[i] : new BillingMadeEasy.Web.Pages.Parties.BrandModel.ColorInput();
+                    <div class="color-row" data-color-row>
+                        <input type="color" value="@(BillingMadeEasy.Core.Design.BrandColor.NormalizeHex(c.Hex) ?? "#000000")" aria-label="Pick colour" data-color-picker />
+                        <input type="text" name="Form.Colors[@i].Hex" value="@c.Hex" class="mono upper" placeholder="#E63946" maxlength="7" aria-label="Colour code" data-color-hex />
+                        <input type="text" name="Form.Colors[@i].Name" value="@c.Name" placeholder="Primary" maxlength="40" aria-label="Colour name" />
+                        <button type="button" class="icon-btn" data-remove-color aria-label="Remove colour"><span class="ms" aria-hidden="true">close</span></button>
+                        @Html.ValidationMessage($"Form.Colors[{i}].Hex", new { @class = "field-error" })
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="form-card">
+            <h2>Type and voice</h2>
+            <div class="fields two">
+                <label class="field"><span>Heading font</span><input asp-for="Form.FontHeading" placeholder="Poppins" list="font-suggestions" /></label>
+                <label class="field"><span>Body font</span><input asp-for="Form.FontBody" placeholder="Inter" list="font-suggestions" /></label>
+                <label class="field span-2"><span>Tagline</span><input asp-for="Form.Tagline" placeholder="Fresh food, honestly made" /></label>
+            </div>
+            <datalist id="font-suggestions">
+                @foreach (var f in new[] { "Inter", "Poppins", "Montserrat", "Roboto", "Open Sans", "Lato", "Playfair Display", "Merriweather", "Nunito", "Raleway", "Oswald", "DM Sans", "Mukta", "Hind", "Noto Sans Devanagari", "Tiro Devanagari Hindi" }) { <option value="@f"></option> }
+            </datalist>
+        </section>
+
+        <section class="form-card">
+            <h2>Online</h2>
+            <div class="fields two">
+                <label class="field"><span>Website</span><input asp-for="Form.Website" inputmode="url" placeholder="freshbite.in" /></label>
+                <label class="field"><span>Instagram</span><input asp-for="Form.Instagram" placeholder="@@freshbite" /></label>
+                <label class="field"><span>Facebook</span><input asp-for="Form.Facebook" placeholder="freshbitefoods" /></label>
+                <label class="field"><span>LinkedIn</span><input asp-for="Form.LinkedIn" placeholder="freshbite-foods" /></label>
+                <label class="field"><span>YouTube</span><input asp-for="Form.YouTube" placeholder="@@freshbite" /></label>
+            </div>
+        </section>
+
+        <section class="form-card">
+            <h2>Do's and don'ts</h2>
+            <label class="field">
+                <span class="muted small">The client's rules: logo clear space, colours never to use, words to avoid, approval steps.</span>
+                <textarea asp-for="Form.Guidelines" rows="6" placeholder="Never place the logo on red.&#10;Always write FreshBite as one word, capital B.&#10;Prices only in ₹, never Rs."></textarea>
+            </label>
+        </section>
+
+        <footer class="action-bar">
+            <a class="btn" href="/Parties/@k.PartyId/Brand/@k.PartyBrandId" data-cancel>Cancel <kbd>Esc</kbd></a>
+            <button type="submit" class="btn primary">Save brand kit <kbd>Ctrl Enter</kbd></button>
+        </footer>
+    </form>
+}
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+    <script src="~/js/form.js" asp-append-version="true"></script>
+    <script src="~/js/dialogs.js" asp-append-version="true"></script>
+    <script src="~/js/brand.js" asp-append-version="true"></script>
+}

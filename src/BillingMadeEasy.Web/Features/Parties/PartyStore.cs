@@ -113,6 +113,36 @@ public sealed class PartyBrand
     public string BrandName { get; init; } = "";
     public string? BrandCode { get; init; }
     public string? Description { get; init; }
+    public string? LogoPath { get; init; }
+    public string? ColorPalette { get; init; }
+}
+
+public sealed class BrandKit : ProcResult
+{
+    public long PartyBrandId { get; init; }
+    public long PartyId { get; init; }
+    public string PartyName { get; init; } = "";
+    public string BrandName { get; init; } = "";
+    public string? BrandCode { get; init; }
+    public string? Description { get; init; }
+    public string? LogoPath { get; init; }
+    public string? LogoDarkPath { get; init; }
+    public string? ColorPalette { get; init; }
+    public string? FontHeading { get; init; }
+    public string? FontBody { get; init; }
+    public string? Tagline { get; init; }
+    public string? Website { get; init; }
+    public string? Instagram { get; init; }
+    public string? Facebook { get; init; }
+    public string? LinkedIn { get; init; }
+    public string? YouTube { get; init; }
+    public string? Guidelines { get; init; }
+    public DateTime? UpdatedAtUtc { get; init; }
+}
+
+public sealed class LogoResult : ProcResult
+{
+    public string? OldPath { get; init; }
 }
 
 public sealed record PartyDetail(
@@ -137,6 +167,11 @@ public sealed class PartySaveResult : SaveResult
 {
     public long PartyId { get; init; }
     public bool IsNew { get; init; }
+}
+
+public sealed class BrandSaveResult : SaveResult
+{
+    public long PartyBrandId { get; init; }
 }
 
 public sealed class LocationSaveResult : SaveResult
@@ -219,8 +254,8 @@ public sealed class PartyStore(IDb db)
     public Task<SaveResult> SaveContactAsync(object parameters, CancellationToken ct) =>
         db.ResultAsync<SaveResult>("dbo.usp_PartyContact_Save", parameters, ct);
 
-    public Task<SaveResult> SaveBrandAsync(object parameters, CancellationToken ct) =>
-        db.ResultAsync<SaveResult>("dbo.usp_PartyBrand_Save", parameters, ct);
+    public Task<BrandSaveResult> SaveBrandAsync(object parameters, CancellationToken ct) =>
+        db.ResultAsync<BrandSaveResult>("dbo.usp_PartyBrand_Save", parameters, ct);
 
     public Task<SaveResult> DeleteAsync(string kind, long tenantId, long partyId, long id, long userId, string? ip, CancellationToken ct) => kind switch
     {
@@ -230,6 +265,17 @@ public sealed class PartyStore(IDb db)
         "brand" => db.ResultAsync<SaveResult>("dbo.usp_PartyBrand_Delete", new { TenantId = tenantId, PartyId = partyId, PartyBrandId = id, ActionByUserId = userId, IpAddress = ip }, ct),
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
+
+    public async Task<BrandKit?> GetKitAsync(long tenantId, long partyId, long brandId, CancellationToken ct) =>
+        await db.SingleAsync<BrandKit>("dbo.usp_PartyBrand_GetKit", new { TenantId = tenantId, PartyId = partyId, PartyBrandId = brandId }, ct)
+            is { PartyBrandId: > 0 } kit ? kit : null;
+
+    public Task<SaveResult> SaveKitAsync(object parameters, CancellationToken ct) =>
+        db.ResultAsync<SaveResult>("dbo.usp_PartyBrand_SaveKit", parameters, ct);
+
+    public Task<LogoResult> SetLogoAsync(long tenantId, long partyId, long brandId, byte variant, string? path, long userId, string? ip, CancellationToken ct) =>
+        db.ResultAsync<LogoResult>("dbo.usp_PartyBrand_SetLogo",
+            new { TenantId = tenantId, PartyId = partyId, PartyBrandId = brandId, Variant = variant, Path = path, ActionByUserId = userId, IpAddress = ip }, ct);
 
     public async Task<IReadOnlyList<Lookup>> CategoriesAsync(long tenantId, CancellationToken ct) =>
         (await db.ListAsync<CategoryRow>("dbo.usp_Category_List", new { TenantId = tenantId, AppliesTo = (byte)1 }, ct))
