@@ -33,8 +33,9 @@ database and the same stored procedures, so nothing has to be migrated twice.
 
 1. **Get the code and scripts into the repository** (below). Nothing else can be ported faithfully without them.
 2. ~~Find the database holding the redesign.~~ Done: it is **`BME_db`** (see `database/legacy/README.md`). `BillingMadeEasy` is the earlier design.
-3. Port sign-in: `SqlAuthService` over `usp_Auth_Identity_Resolve`, `usp_Auth_Credential_Get`, `usp_Auth_Attempt_Register`, `usp_Auth_UserTenants_Get`, `usp_Auth_Session_SelectTenant`, `usp_Auth_Permissions_Get`. Then set `Auth:Provider` to `Sql`.
-4. Run `database/scripts/30_module_entitlements.sql`, register `SqlEntitlementStore`.
+3. ~~Port sign-in.~~ Done: `SqlAuthService` over the `usp_Auth_*` procedures, with the lockout ladder, server sessions re-checked on every request, idle lock and unlock, and silent hash upgrade. Tested against a database built from `database/schema`.
+4. Run `database/scripts/30_module_entitlements.sql` on BME_db once. `SqlEntitlementStore` is wired.
+   Still to port from Web Forms: OTP sign-in, PIN unlock and trusted devices, forgot/reset password, invite acceptance, must-change-password.
 5. Port screen by screen: users and roles → settings → parties → catalog → numbering → subscriptions. Each one becomes an `IAppModule` folder.
 6. Build the invoice (stage 9) on .NET 10 only.
 

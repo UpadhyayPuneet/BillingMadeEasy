@@ -30,11 +30,10 @@ if (string.Equals(authProvider, "Demo", StringComparison.OrdinalIgnoreCase))
 }
 else
 {
-    // The SQL-backed IAuthService and IEntitlementStore wrap the usp_Auth_* procedures from
-    // database/scripts. They land once those scripts are in the repository (see docs/MIGRATION.md).
-    throw new InvalidOperationException(hasDatabase
-        ? "SQL sign-in is not wired yet. Set Auth:Provider=Demo in Development until the usp_Auth_* port lands."
-        : "No connection string 'BillingMadeEasy'. Set one, or use Auth:Provider=Demo in Development.");
+    if (!hasDatabase)
+        throw new InvalidOperationException("No connection string 'BillingMadeEasy'. Set one, or use Auth:Provider=Demo in Development.");
+    services.AddSingleton<IAuthService, SqlAuthService>();
+    services.AddSingleton<IEntitlementStore, SqlEntitlementStore>();
 }
 
 services.AddMemoryCache();
@@ -53,8 +52,9 @@ services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
         options.LoginPath = "/Account/SignIn";
         options.LogoutPath = "/Account/SignOut";
         options.AccessDeniedPath = "/Account/Denied";
-        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.ExpireTimeSpan = TimeSpan.FromHours(12);   // matches the server session lifetime
         options.SlidingExpiration = true;
+        options.Events.OnValidatePrincipal = SessionValidation.ValidateAsync;
         options.Events.OnRedirectToLogin = context =>
         {
             if (context.Request.Path.StartsWithSegments("/api")) context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -75,12 +75,13 @@ services.AddAuthorizationBuilder()
     .AddPolicy(Policies.PlatformAdmin, p => p.RequireAuthenticatedUser().RequireClaim(AppClaims.PlatformAdmin, "1"));
 
 // ── Throttle sign-in per IP (enumeration and brute force) ──
+int signInPermits = builder.Configuration.GetValue("Auth:SignInRequestsPerMinute", 10);
 services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.AddPolicy("sign-in", context => RateLimitPartition.GetFixedWindowLimiter(
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = signInPermits, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 
 services.AddRazorPages(options =>
@@ -91,6 +92,7 @@ services.AddRazorPages(options =>
     options.Conventions.AllowAnonymousToPage("/Account/SignOut");
     options.Conventions.AllowAnonymousToPage("/Account/Denied");
     options.Conventions.AuthorizePage("/Account/ChooseBusiness", Policies.SignedIn);
+    options.Conventions.AuthorizePage("/Account/Unlock", Policies.SignedIn);
     options.Conventions.AllowAnonymousToPage("/Error");
 });
 
@@ -118,6 +120,7 @@ app.UseStaticFiles();
 app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();
+app.UseSessionLock();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health").AllowAnonymous();

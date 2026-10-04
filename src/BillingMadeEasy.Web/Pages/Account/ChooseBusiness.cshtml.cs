@@ -23,7 +23,9 @@ public sealed class ChooseBusinessModel(IAuthService auth) : PageModel
 
     public async Task<IActionResult> OnPostAsync(long tenantId, CancellationToken ct)
     {
-        var session = await auth.SelectTenantAsync(User.GetUserId()!.Value, tenantId, ct);
+        string? sessionKey = User.FindFirst(AppClaims.SessionKey)?.Value;
+        if (sessionKey is null) return Forbid();
+        var session = await auth.SelectTenantAsync(sessionKey, User.GetUserId()!.Value, tenantId, ct);
         if (session is null) return Forbid();
 
         var current = await HttpContext.AuthenticateAsync();

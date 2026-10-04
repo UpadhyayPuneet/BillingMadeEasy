@@ -213,3 +213,4 @@ body.auth { display: grid; place-items: center; min-height: 100vh; padding: var(
 @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
 }
+.unlock-switch { margin-top: var(--space-3); }

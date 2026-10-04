@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using BillingMadeEasy.Core.Security;
 using BillingMadeEasy.Core.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -10,7 +9,7 @@ namespace BillingMadeEasy.Web.Infrastructure.Auth;
 public static class SessionSignIn
 {
     public static Task SignInPersonAsync(HttpContext http, SignInOutcome outcome, bool remember) =>
-        IssueAsync(http, Person(outcome.UserId, outcome.DisplayName, outcome.IsPlatformAdmin), remember);
+        IssueAsync(http, Person(outcome.UserId, outcome.DisplayName, outcome.IsPlatformAdmin, outcome.SessionKey), remember);
 
     /// <summary>After choosing a business from the picker: the person is already signed in.</summary>
     public static Task SignInTenantAsync(HttpContext http, ClaimsPrincipal current, TenantSession session, bool remember) =>
@@ -18,15 +17,16 @@ public static class SessionSignIn
             current.GetUserId() ?? throw new InvalidOperationException("No signed-in person."),
             current.Identity?.Name ?? string.Empty,
             current.HasClaim(AppClaims.PlatformAdmin, "1"),
+            current.FindFirst(AppClaims.SessionKey)?.Value ?? throw new InvalidOperationException("No session."),
             session, remember);
 
     /// <summary>Straight from sign-in when the person belongs to exactly one business.</summary>
     public static Task SignInTenantAsync(HttpContext http, SignInOutcome outcome, TenantSession session, bool remember) =>
-        SignInTenantAsync(http, outcome.UserId, outcome.DisplayName, outcome.IsPlatformAdmin, session, remember);
+        SignInTenantAsync(http, outcome.UserId, outcome.DisplayName, outcome.IsPlatformAdmin, outcome.SessionKey, session, remember);
 
-    private static Task SignInTenantAsync(HttpContext http, long userId, string displayName, bool platformAdmin, TenantSession session, bool remember)
+    private static Task SignInTenantAsync(HttpContext http, long userId, string displayName, bool platformAdmin, string sessionKey, TenantSession session, bool remember)
     {
-        var claims = Person(userId, displayName, platformAdmin);
+        var claims = Person(userId, displayName, platformAdmin, sessionKey);
         claims.Add(new Claim(AppClaims.TenantId, session.TenantId.ToString()));
         claims.Add(new Claim(AppClaims.TenantName, session.TenantName));
         claims.Add(new Claim(ClaimTypes.Role, session.RoleName));
@@ -34,13 +34,13 @@ public static class SessionSignIn
         return IssueAsync(http, claims, remember);
     }
 
-    private static List<Claim> Person(long userId, string displayName, bool platformAdmin)
+    private static List<Claim> Person(long userId, string displayName, bool platformAdmin, string sessionKey)
     {
         var claims = new List<Claim>
         {
             new(AppClaims.UserId, userId.ToString()),
             new(ClaimTypes.Name, displayName),
-            new(AppClaims.SessionKey, SecureTokens.UrlToken(16)),
+            new(AppClaims.SessionKey, sessionKey),
         };
         if (platformAdmin) claims.Add(new Claim(AppClaims.PlatformAdmin, "1"));
         return claims;

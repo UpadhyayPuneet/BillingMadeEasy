@@ -1,12 +1,14 @@
 /*  30 · Module entitlements: plans, add-ons, platform grants, trials, limits.
     Backs IEntitlementStore. Module keys match ModuleCatalog in BillingMadeEasy.Core.
 
-    NOT YET RUN ANYWHERE. Review before running:
-      - Assumes tbl_Tenants has an INT primary key named TenantId. The foreign keys are only
-        added when that is true, so the script is safe to run either way, but check the output.
-      - Idempotent: safe to run more than once.  */
+    Run on BME_db after the existing scripts. Idempotent: safe to run more than once.
+    Existing businesses with no plan are put on 'business' (every released module), so turning
+    this on takes nothing away from anyone. Tested against the BME_db schema exported 4 Oct 2026.  */
 
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;   -- required by the filtered unique index
 SET XACT_ABORT ON;
+GO
 BEGIN TRANSACTION;
 
 IF OBJECT_ID('dbo.tbl_Plans', 'U') IS NULL
@@ -46,12 +48,13 @@ CREATE TABLE dbo.tbl_PlanLimits
 IF OBJECT_ID('dbo.tbl_TenantPlans', 'U') IS NULL
 CREATE TABLE dbo.tbl_TenantPlans
 (
-    TenantId        INT          NOT NULL CONSTRAINT PK_tbl_TenantPlans PRIMARY KEY,
+    TenantId        BIGINT       NOT NULL CONSTRAINT PK_tbl_TenantPlans PRIMARY KEY
+                                 CONSTRAINT FK_tbl_TenantPlans_Tenant REFERENCES dbo.tbl_Tenants (TenantId),
     PlanId          INT          NOT NULL CONSTRAINT FK_tbl_TenantPlans_Plan REFERENCES dbo.tbl_Plans (PlanId),
     BillingCycle    TINYINT      NOT NULL CONSTRAINT CK_tbl_TenantPlans_Cycle CHECK (BillingCycle IN (1, 12)),
     CurrentPeriodEnd DATE        NULL,
     ChangedAt       DATETIME2(0) NOT NULL CONSTRAINT DF_tbl_TenantPlans_Changed DEFAULT (SYSUTCDATETIME()),
-    ChangedByUserId INT          NULL
+    ChangedByUserId BIGINT       NULL
 );
 
 /* Modules a tenant has on top of the plan.
@@ -60,34 +63,21 @@ CREATE TABLE dbo.tbl_TenantPlans
 IF OBJECT_ID('dbo.tbl_TenantModules', 'U') IS NULL
 CREATE TABLE dbo.tbl_TenantModules
 (
-    TenantModuleId  INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_tbl_TenantModules PRIMARY KEY,
-    TenantId        INT          NOT NULL,
+    TenantModuleId  BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_tbl_TenantModules PRIMARY KEY,
+    TenantId        BIGINT       NOT NULL CONSTRAINT FK_tbl_TenantModules_Tenant REFERENCES dbo.tbl_Tenants (TenantId),
     ModuleKey       VARCHAR(40)  NOT NULL,
     Source          TINYINT      NOT NULL CONSTRAINT CK_tbl_TenantModules_Source CHECK (Source IN (2, 3, 4)),
     StartsAt        DATETIME2(0) NOT NULL CONSTRAINT DF_tbl_TenantModules_Starts DEFAULT (SYSUTCDATETIME()),
     ExpiresAt       DATETIME2(0) NULL,
     RevokedAt       DATETIME2(0) NULL,
     Reason          NVARCHAR(200) NULL,
-    GrantedByUserId INT          NULL,
+    GrantedByUserId BIGINT       NULL,
     CONSTRAINT CK_tbl_TenantModules_Trial CHECK (Source <> 4 OR ExpiresAt IS NOT NULL)
 );
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_tbl_TenantModules_Active')
 CREATE UNIQUE INDEX UX_tbl_TenantModules_Active
     ON dbo.tbl_TenantModules (TenantId, ModuleKey) WHERE RevokedAt IS NULL;
-
-/* Foreign keys to tbl_Tenants, only when its key is INT TenantId. */
-IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id = c.user_type_id
-           WHERE c.object_id = OBJECT_ID('dbo.tbl_Tenants') AND c.name = 'TenantId' AND t.name = 'int')
-BEGIN
-    IF OBJECT_ID('dbo.FK_tbl_TenantPlans_Tenant', 'F') IS NULL
-        EXEC (N'ALTER TABLE dbo.tbl_TenantPlans ADD CONSTRAINT FK_tbl_TenantPlans_Tenant FOREIGN KEY (TenantId) REFERENCES dbo.tbl_Tenants (TenantId);');
-    IF OBJECT_ID('dbo.FK_tbl_TenantModules_Tenant', 'F') IS NULL
-        EXEC (N'ALTER TABLE dbo.tbl_TenantModules ADD CONSTRAINT FK_tbl_TenantModules_Tenant FOREIGN KEY (TenantId) REFERENCES dbo.tbl_Tenants (TenantId);');
-    PRINT 'Foreign keys to tbl_Tenants added.';
-END
-ELSE
-    PRINT 'tbl_Tenants.TenantId is not INT (or missing): foreign keys skipped. Adjust TenantId types and re-run.';
 
 /* Starter plans. Prices are placeholders: set them before launch. */
 MERGE dbo.tbl_Plans AS t
@@ -121,32 +111,57 @@ JOIN (VALUES
 ) AS l (PlanCode, Meter, LimitValue) ON l.PlanCode = p.PlanCode
 WHERE NOT EXISTS (SELECT 1 FROM dbo.tbl_PlanLimits x WHERE x.PlanId = p.PlanId AND x.Meter = l.Meter);
 
+/* Existing businesses keep everything they have today. */
+INSERT INTO dbo.tbl_TenantPlans (TenantId, PlanId, BillingCycle)
+SELECT t.TenantId, p.PlanId, 12
+FROM dbo.tbl_Tenants t
+CROSS JOIN dbo.tbl_Plans p
+WHERE p.PlanCode = 'business'
+  AND NOT EXISTS (SELECT 1 FROM dbo.tbl_TenantPlans x WHERE x.TenantId = t.TenantId);
+
 COMMIT TRANSACTION;
 GO
 
-/* Three result sets: header row (ResultCode contract), active module grants, limits. */
+/* Three result sets: header row (ResultCode contract), active module grants, limits.
+   A tenant with no plan row (signed up after this script) falls back to:
+     - in trial (tbl_Tenants.Status = 1): every module of 'business', as a trial ending at TrialEndsOnUtc;
+     - otherwise: 'start'.  */
 CREATE OR ALTER PROCEDURE dbo.usp_Tenant_Entitlements_Get
-    @TenantId INT
+    @TenantId BIGINT
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    DECLARE @PlanId INT, @PlanCode VARCHAR(40);
+    DECLARE @now DATETIME2(0) = SYSUTCDATETIME();
+    DECLARE @PlanId INT, @PlanCode VARCHAR(40), @Source TINYINT = 1, @PlanExpires DATETIME2(0) = NULL;
+
     SELECT @PlanId = tp.PlanId, @PlanCode = p.PlanCode
     FROM dbo.tbl_TenantPlans tp JOIN dbo.tbl_Plans p ON p.PlanId = tp.PlanId
     WHERE tp.TenantId = @TenantId;
 
+    IF @PlanId IS NULL
+    BEGIN
+        DECLARE @status TINYINT, @trialEnds DATETIME2(3);
+        SELECT @status = Status, @trialEnds = TrialEndsOnUtc FROM dbo.tbl_Tenants WHERE TenantId = @TenantId AND IsActive = 1;
+
+        IF @status = 1 AND (@trialEnds IS NULL OR @trialEnds > @now)
+            SELECT @PlanId = PlanId, @PlanCode = 'trial', @Source = 4, @PlanExpires = @trialEnds
+            FROM dbo.tbl_Plans WHERE PlanCode = 'business';
+        ELSE IF @status IS NOT NULL
+            SELECT @PlanId = PlanId, @PlanCode = PlanCode FROM dbo.tbl_Plans WHERE PlanCode = 'start';
+    END
+
     SELECT ResultCode = CASE WHEN @PlanId IS NULL THEN 1 ELSE 0 END,
-           ResultMessage = CASE WHEN @PlanId IS NULL THEN 'Tenant has no plan.' ELSE NULL END,
+           ResultMessage = CASE WHEN @PlanId IS NULL THEN 'Tenant not found or inactive.' ELSE NULL END,
            PlanCode = ISNULL(@PlanCode, '');
 
-    SELECT ModuleKey, Source = CAST(1 AS TINYINT), ExpiresAt = CAST(NULL AS DATETIME2(0))
+    SELECT ModuleKey, Source = @Source, ExpiresAt = @PlanExpires
     FROM dbo.tbl_PlanModules WHERE PlanId = @PlanId
     UNION ALL
     SELECT ModuleKey, Source, ExpiresAt
     FROM dbo.tbl_TenantModules
-    WHERE TenantId = @TenantId AND RevokedAt IS NULL AND StartsAt <= SYSUTCDATETIME()
-      AND (ExpiresAt IS NULL OR ExpiresAt > SYSUTCDATETIME());
+    WHERE TenantId = @TenantId AND RevokedAt IS NULL AND StartsAt <= @now
+      AND (ExpiresAt IS NULL OR ExpiresAt > @now);
 
     SELECT Meter, LimitValue FROM dbo.tbl_PlanLimits WHERE PlanId = @PlanId;
 END

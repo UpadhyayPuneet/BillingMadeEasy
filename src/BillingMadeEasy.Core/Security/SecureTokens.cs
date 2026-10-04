@@ -23,6 +23,14 @@ public static class SecureTokens
         Convert.ToBase64String(RandomNumberGenerator.GetBytes(bytes))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
+    /// <summary>The 32-byte key that identifies a session row (<c>tbl_UserSessions.SessionKeyHash</c>).
+    /// The raw key lives only inside the encrypted auth cookie.</summary>
+    public static byte[] SessionKeyHash(string sessionKey)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(sessionKey);
+        return SHA256.HashData(Encoding.UTF8.GetBytes(sessionKey));
+    }
+
     public static string NewSalt() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
 
     /// <summary>Hex SHA-256 of salt + token. Check the encoding against <c>ClassSecurity</c> before

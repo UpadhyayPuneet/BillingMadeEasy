@@ -1,0 +1,26 @@
+@page
+@model BillingMadeEasy.Web.Pages.Account.UnlockModel
+@{
+    ViewData["Title"] = "Locked";
+    Layout = "_AuthLayout";
+}
+<h1>Welcome back@(string.IsNullOrEmpty(Model.Name) ? "" : ", " + Model.Name.Split(' ')[0])</h1>
+<p class="muted">Locked after a few idle minutes. Your work is where you left it.</p>
+
+@if (Model.Error is not null)
+{
+    <div class="notice danger" role="alert">@Model.Error</div>
+}
+
+<form method="post" class="form" novalidate>
+    <input type="hidden" asp-for="ReturnUrl" />
+    <label class="field">
+        <span>Password</span>
+        <input asp-for="Password" autocomplete="current-password" autofocus />
+        <span asp-validation-for="Password" class="field-error"></span>
+    </label>
+    <button type="submit" class="btn primary block">Unlock <kbd>Enter</kbd></button>
+</form>
+<form method="post" asp-page="/Account/SignOut" class="unlock-switch">
+    <button type="submit" class="btn block">Not you? Sign out</button>
+</form>

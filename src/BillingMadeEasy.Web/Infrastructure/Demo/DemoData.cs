@@ -34,26 +34,35 @@ public sealed class DemoAuthService : IAuthService
 {
     private static readonly string[] OwnerPermissions = ["*"];
 
-    public Task<SignInOutcome> SignInAsync(string identifier, string password, string? ipAddress, CancellationToken ct = default)
+    public Task<SignInOutcome> SignInAsync(string identifier, string password, RequestInfo request, CancellationToken ct = default)
     {
         bool ok = string.Equals(identifier.Trim(), DemoData.Email, StringComparison.OrdinalIgnoreCase)
                   && PasswordHasher.Verify(password, DemoData.PasswordHash);
 
         return Task.FromResult(ok
-            ? new SignInOutcome(SignInStatus.Success, 1, "Demo Owner", IsPlatformAdmin: true, Tenants: DemoData.Tenants)
+            ? new SignInOutcome(SignInStatus.Success, 1, "Demo Owner", IsPlatformAdmin: true, SessionKey: SecureTokens.UrlToken(), Tenants: DemoData.Tenants)
             : new SignInOutcome(SignInStatus.InvalidCredentials));
     }
 
     public Task<IReadOnlyList<TenantMembership>> GetTenantsAsync(long userId, CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<TenantMembership>>(userId == 1 ? DemoData.Tenants : []);
 
-    public Task<TenantSession?> SelectTenantAsync(long userId, long tenantId, CancellationToken ct = default)
+    public Task<TenantSession?> SelectTenantAsync(string sessionKey, long userId, long tenantId, CancellationToken ct = default)
     {
         var membership = userId == 1 ? DemoData.Tenants.FirstOrDefault(t => t.TenantId == tenantId) : null;
         return Task.FromResult(membership is null
             ? null
             : new TenantSession(membership.TenantId, membership.TenantName, membership.RoleName, OwnerPermissions));
     }
+
+    /// <summary>Demo sessions never lock or expire server-side; the cookie lifetime still applies.</summary>
+    public Task<SessionState> ValidateSessionAsync(string sessionKey, string? ipAddress, CancellationToken ct = default) =>
+        Task.FromResult(new SessionState(SessionStatus.Active));
+
+    public Task<SignInOutcome> UnlockAsync(string sessionKey, long userId, string password, RequestInfo request, CancellationToken ct = default) =>
+        Task.FromResult(new SignInOutcome(PasswordHasher.Verify(password, DemoData.PasswordHash) ? SignInStatus.Success : SignInStatus.InvalidCredentials, userId));
+
+    public Task SignOutAsync(string sessionKey, CancellationToken ct = default) => Task.CompletedTask;
 }
 
 public sealed class DemoEntitlementStore : IEntitlementStore

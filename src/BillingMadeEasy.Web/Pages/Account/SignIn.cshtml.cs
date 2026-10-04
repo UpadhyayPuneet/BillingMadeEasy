@@ -32,15 +32,15 @@ public sealed class SignInModel(IAuthService auth, IWebHostEnvironment environme
     {
         if (!ModelState.IsValid) return Page();
 
-        var outcome = await auth.SignInAsync(Identifier, Password, HttpContext.Connection.RemoteIpAddress?.ToString(), ct);
+        var outcome = await auth.SignInAsync(Identifier, Password, RequestInfo.From(HttpContext), ct);
         switch (outcome.Status)
         {
             case SignInStatus.Success:
                 break;
             case SignInStatus.Locked:
                 Error = outcome.LockedUntil is { } until
-                    ? $"Too many attempts. Try again after {until.ToLocalTime():t}, or reset your password."
-                    : "Too many attempts. Reset your password to get back in.";
+                    ? $"Too many attempts. Try again in {Math.Max(1, (int)Math.Ceiling((until - DateTimeOffset.UtcNow).TotalMinutes))} minutes."
+                    : "Too many attempts. Sign-in is blocked until an administrator releases it.";
                 return Page();
             case SignInStatus.NoActiveBusiness:
                 Error = "Your account isn't part of an active business yet. Ask the owner to invite you.";
@@ -52,7 +52,7 @@ public sealed class SignInModel(IAuthService auth, IWebHostEnvironment environme
         }
 
         var tenants = outcome.Tenants ?? [];
-        var session = tenants.Count == 1 ? await auth.SelectTenantAsync(outcome.UserId, tenants[0].TenantId, ct) : null;
+        var session = tenants.Count == 1 ? await auth.SelectTenantAsync(outcome.SessionKey, outcome.UserId, tenants[0].TenantId, ct) : null;
         if (session is not null)
         {
             await SessionSignIn.SignInTenantAsync(HttpContext, outcome, session, Remember);

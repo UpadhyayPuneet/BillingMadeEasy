@@ -14,15 +14,32 @@ Needs the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 dotnet run --project src/BillingMadeEasy.Web
 ```
 
-Open the URL it prints. In Development it signs in with demo data, no database needed:
-`owner@demo.test` / `Demo@12345`. The demo user belongs to two businesses with different
-modules switched on, so you can see the picker and module gating.
+Development signs in against your local `BME_db` (Windows authentication). Once, before the
+first run, open `database/scripts/30_module_entitlements.sql` in SSMS against BME_db and run it.
+Then sign in with your usual email and password.
+
+No database at hand? Run with demo data instead:
+
+```powershell
+dotnet run --project src/BillingMadeEasy.Web -- --Auth:Provider=Demo
+```
+
+Demo sign-in: `owner@demo.test` / `Demo@12345` (two businesses with different modules).
 
 Try `Ctrl+K`, `g` then `p`, `?`, and the mic button (Chrome or Edge).
 
 ## Test it
 
 ```powershell
+dotnet test
+```
+
+The SQL Server tests build a throwaway database from `database/schema` and `database/scripts`
+and drop it afterwards. They run when `BME_TEST_SQL` is set to a server connection whose login
+can create databases, and are skipped otherwise:
+
+```powershell
+$env:BME_TEST_SQL = "Server=.;Integrated Security=True;TrustServerCertificate=True"
 dotnet test
 ```
 
@@ -36,6 +53,7 @@ src/
 tests/
   BillingMadeEasy.Tests  Unit tests and end-to-end tests through the real HTTP pipeline
 database/
+  schema/   BME_db structure and reference data (builds a new database from scratch)
   legacy/   Schema script of the earlier database design (reference only)
   scripts/  New migrations, numbered after the Web Forms scripts
   tools/    Read-only diagnostic queries
@@ -47,7 +65,8 @@ docs/
 | Key | Default | Meaning |
 |---|---|---|
 | `ConnectionStrings:BillingMadeEasy` | empty | SQL Server connection |
-| `Auth:Provider` | `Sql` (`Demo` in Development) | `Demo` is refused outside Development |
+| `Auth:Provider` | `Sql` | `Demo` uses built-in sample data and is refused outside Development |
+| `Auth:SignInRequestsPerMinute` | 10 | Per-IP throttle on sign-in and unlock |
 | `Database:CommandTimeoutSeconds` | 30 | Interactive calls |
 | `Database:BatchTimeoutSeconds` | 120 | Billing runs |
 

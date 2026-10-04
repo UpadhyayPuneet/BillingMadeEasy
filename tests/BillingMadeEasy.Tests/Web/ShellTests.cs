@@ -28,6 +28,7 @@ public sealed class AppFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
+        builder.UseSetting("Auth:Provider", "Demo");
         builder.ConfigureTestServices(services => services.AddSingleton<IAppModule, ProbeInventoryModule>());
     }
 }
