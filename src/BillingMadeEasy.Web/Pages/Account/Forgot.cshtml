@@ -1,0 +1,27 @@
+@page
+@model BillingMadeEasy.Web.Pages.Account.ForgotModel
+@{
+    ViewData["Title"] = "Forgot password";
+    Layout = "_AuthLayout";
+}
+@if (Model.Sent)
+{
+    <h1>Check your email</h1>
+    <p class="muted">If <strong>@Model.Email</strong> belongs to an account, a link to choose a new password is on its way. It works once, for an hour.</p>
+    <p class="muted small">Nothing after a few minutes? Check spam, or ask your business owner to check the address on your account.</p>
+    <a class="btn primary block" href="/Account/SignIn">Back to sign in</a>
+}
+else
+{
+    <h1>Forgot your password?</h1>
+    <p class="muted">We'll email you a link to choose a new one.</p>
+    <form method="post" class="form" novalidate>
+        <label class="field">
+            <span>Email or mobile</span>
+            <input asp-for="Email" type="text" autocomplete="username" autofocus inputmode="email" />
+            <span asp-validation-for="Email" class="field-error"></span>
+        </label>
+        <button type="submit" class="btn primary block">Send reset link <kbd>Enter</kbd></button>
+    </form>
+    <p class="small"><a href="/Account/SignIn">Back to sign in</a></p>
+}

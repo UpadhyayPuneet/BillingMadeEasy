@@ -51,6 +51,15 @@ public static class SessionValidation
             bool exempt = path.StartsWithSegments("/Account/Unlock") || path.StartsWithSegments("/Account/SignOut")
                           || path.StartsWithSegments("/health");
 
+            // A flagged account replaces its password before doing anything else.
+            if (!locked && !exempt && !path.StartsWithSegments("/Account/Password")
+                && context.User.HasClaim(AppClaims.MustChangePassword, "1"))
+            {
+                if (path.StartsWithSegments("/api")) context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                else context.Response.Redirect("/Account/Password?required=1");
+                return;
+            }
+
             if (!locked || exempt)
             {
                 await next();

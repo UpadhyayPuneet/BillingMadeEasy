@@ -13,6 +13,9 @@ public static class AppClaims
     public const string Permission = "bme:perm";
     public const string PlatformAdmin = "bme:padmin";
 
+    /// <summary>Present until the person replaces a temporary or administrator-set password.</summary>
+    public const string MustChangePassword = "bme:mustchange";
+
     public static long? GetUserId(this ClaimsPrincipal user) => ParseLong(user.FindFirst(UserId)?.Value);
 
     public static long? GetTenantId(this ClaimsPrincipal user) => ParseLong(user.FindFirst(TenantId)?.Value);

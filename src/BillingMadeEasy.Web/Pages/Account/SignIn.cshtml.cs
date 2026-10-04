@@ -28,8 +28,12 @@ public sealed class SignInModel(IAuthService auth, IWebHostEnvironment environme
     /// <summary>Arriving from the welcome page: password just set.</summary>
     public bool JustWelcomed { get; private set; }
 
-    public IActionResult OnGet(string? email, int? welcome)
+    /// <summary>Arriving from a password reset.</summary>
+    public bool JustReset { get; private set; }
+
+    public IActionResult OnGet(string? email, int? welcome, int? reset)
     {
+        JustReset = reset == 1;
         if (User.Identity?.IsAuthenticated == true) return LocalRedirect(SafeReturnUrl);
         if (!string.IsNullOrWhiteSpace(email)) Identifier = email.Trim();
         JustWelcomed = welcome == 1;

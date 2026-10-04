@@ -40,7 +40,7 @@ public sealed class DemoAuthService : IAuthService
                   && PasswordHasher.Verify(password, DemoData.PasswordHash);
 
         return Task.FromResult(ok
-            ? new SignInOutcome(SignInStatus.Success, 1, "Demo Owner", IsPlatformAdmin: true, SessionKey: SecureTokens.UrlToken(), Tenants: DemoData.Tenants)
+            ? new SignInOutcome(SignInStatus.Success, 1, "Demo Owner", IsPlatformAdmin: true, SessionKey: SecureTokens.UrlToken(), Email: DemoData.Email, Tenants: DemoData.Tenants)
             : new SignInOutcome(SignInStatus.InvalidCredentials));
     }
 
@@ -61,6 +61,9 @@ public sealed class DemoAuthService : IAuthService
 
     public Task<SignInOutcome> UnlockAsync(string sessionKey, long userId, string password, RequestInfo request, CancellationToken ct = default) =>
         Task.FromResult(new SignInOutcome(PasswordHasher.Verify(password, DemoData.PasswordHash) ? SignInStatus.Success : SignInStatus.InvalidCredentials, userId));
+
+    public Task<string> RenewSessionAsync(long userId, long? tenantId, RequestInfo request, CancellationToken ct = default) =>
+        Task.FromResult(SecureTokens.UrlToken());
 
     public Task LockAsync(string sessionKey, CancellationToken ct = default) => Task.CompletedTask;
 

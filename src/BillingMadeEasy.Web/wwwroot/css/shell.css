@@ -381,3 +381,4 @@ fieldset.plain { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; 
 .menu-list a kbd { margin-left: auto; }
 .menu-list a .ms { font-size: 18px; color: var(--text-2); }
 .topbar .menu > summary.icon-btn { display: grid; }
+.center { text-align: center; }

@@ -10,7 +10,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace BillingMadeEasy.Tests.Sql;
 
-public sealed class SqlAppFactory(SqlDatabaseFixture db) : WebApplicationFactory<Program>
+/// <param name="mailDir">When set, emails are written there as .eml files so a test can open them.</param>
+public sealed class SqlAppFactory(SqlDatabaseFixture db, string? mailDir = null) : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -19,7 +20,8 @@ public sealed class SqlAppFactory(SqlDatabaseFixture db) : WebApplicationFactory
         builder.UseSetting("Auth:Provider", "Sql");
         builder.UseSetting("Auth:SignInRequestsPerMinute", "10000");
         builder.UseSetting("ConnectionStrings:BillingMadeEasy", db.ConnectionString);
-        builder.UseSetting("Email:Mode", "Disabled");   // invite flows fall back to the share link
+        builder.UseSetting("Email:Mode", mailDir is null ? "Disabled" : "Pickup");   // Disabled: invites fall back to the share link
+        if (mailDir is not null) builder.UseSetting("Email:PickupDirectory", mailDir);
     }
 }
 

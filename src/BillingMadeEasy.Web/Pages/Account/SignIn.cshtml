@@ -11,6 +11,10 @@
 {
     <div class="notice" role="status">Your password is set. Sign in to start.</div>
 }
+@if (Model.JustReset)
+{
+    <div class="notice" role="status">Password changed. Sign in with the new one.</div>
+}
 @if (Model.Error is not null)
 {
     <div class="notice danger" role="alert">@Model.Error</div>
@@ -33,6 +37,7 @@
     </label>
     <button type="submit" class="btn primary block">Sign in <kbd>Enter</kbd></button>
 </form>
+<p class="small center"><a href="/Account/Forgot@(string.IsNullOrEmpty(Model.Identifier) ? "" : "?email=" + Uri.EscapeDataString(Model.Identifier))">Forgot password?</a></p>
 
 @if (Model.ShowDemoHint)
 {

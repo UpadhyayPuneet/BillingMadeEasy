@@ -18,6 +18,7 @@
     var commands = readJson('bme-commands', []).concat([
         { title: 'Switch business', href: '/Account/ChooseBusiness', icon: 'swap_horiz', group: 'Account', keywords: 'tenant company workspace change' },
         { title: 'Switch theme', action: 'theme', icon: 'contrast', group: 'Account', keywords: 'dark light mode' },
+        { title: 'Change password', href: '/Account/Password', icon: 'password', group: 'Account', keywords: 'security reset new password' },
         { title: 'Lock screen', href: '/Account/Unlock', icon: 'lock', group: 'Account', keywords: 'lock away break secure', key: 'Ctrl Shift L' },
         { title: 'Keyboard shortcuts', action: 'help', icon: 'keyboard', group: 'Help', keywords: 'keys hotkeys help' },
         { title: 'Sign out', action: 'signout', icon: 'logout', group: 'Account', keywords: 'logout exit' }

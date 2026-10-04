@@ -25,6 +25,7 @@ public sealed record SignInOutcome(
     bool IsPlatformAdmin = false,
     bool MustChangePassword = false,
     string SessionKey = "",
+    string Email = "",
     IReadOnlyList<TenantMembership>? Tenants = null,
     DateTimeOffset? LockedUntil = null);
 
@@ -57,6 +58,10 @@ public interface IAuthService
     Task<SessionState> ValidateSessionAsync(string sessionKey, string? ipAddress, CancellationToken ct = default);
 
     Task<SignInOutcome> UnlockAsync(string sessionKey, long userId, string password, RequestInfo request, CancellationToken ct = default);
+
+    /// <summary>A fresh session for someone already proven (after a password change, which ends all
+    /// sessions). Returns the new session key.</summary>
+    Task<string> RenewSessionAsync(long userId, long? tenantId, RequestInfo request, CancellationToken ct = default);
 
     /// <summary>Locks the session now; it stays locked until the password is entered.</summary>
     Task LockAsync(string sessionKey, CancellationToken ct = default);

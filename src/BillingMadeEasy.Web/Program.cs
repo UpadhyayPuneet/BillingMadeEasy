@@ -48,6 +48,7 @@ services.AddScoped<BillingMadeEasy.Web.Features.Parties.PartyStore>();
 services.AddScoped<BillingMadeEasy.Web.Features.Team.TeamStore>();
 services.AddScoped<BillingMadeEasy.Web.Features.Team.InviteSender>();
 services.AddScoped<AccountTokens>();
+services.AddScoped<BillingMadeEasy.Web.Features.Account.PasswordService>();
 services.AddScoped<BillingMadeEasy.Web.Infrastructure.Settings.SettingsReader>();
 services.AddScoped<BillingMadeEasy.Web.Infrastructure.Email.EmailService>();
 services.AddSingleton(builder.Configuration.GetSection("Email").Get<BillingMadeEasy.Web.Infrastructure.Email.EmailOptions>() ?? new());
@@ -104,6 +105,9 @@ services.AddRazorPages(options =>
     options.Conventions.AllowAnonymousToPage("/Account/SignOut");
     options.Conventions.AllowAnonymousToPage("/Account/Denied");
     options.Conventions.AllowAnonymousToPage("/Account/Welcome");
+    options.Conventions.AllowAnonymousToPage("/Account/Forgot");
+    options.Conventions.AllowAnonymousToPage("/Account/Reset");
+    options.Conventions.AuthorizePage("/Account/Password", Policies.SignedIn);
     options.Conventions.AuthorizePage("/Account/ChooseBusiness", Policies.SignedIn);
     options.Conventions.AuthorizePage("/Account/Unlock", Policies.SignedIn);
     options.Conventions.AllowAnonymousToPage("/Error");

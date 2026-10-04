@@ -31,6 +31,7 @@ public sealed class SqlAuthService(IDb db, ILogger<SqlAuthService> log) : IAuthS
         public bool IsPlatformAdmin { get; init; }
         public bool MustChangePassword { get; init; }
         public string FullName { get; init; } = "";
+        public string Email { get; init; } = "";
     }
 
     private sealed class TenantRow
@@ -97,7 +98,7 @@ public sealed class SqlAuthService(IDb db, ILogger<SqlAuthService> log) : IAuthS
         }, ct);
 
         return new SignInOutcome(SignInStatus.Success, identity.UserId, credential.FullName, credential.IsPlatformAdmin,
-            credential.MustChangePassword, sessionKey, tenants);
+            credential.MustChangePassword, sessionKey, credential.Email, tenants);
     }
 
     public async Task<IReadOnlyList<TenantMembership>> GetTenantsAsync(long userId, CancellationToken ct = default) =>
@@ -144,6 +145,23 @@ public sealed class SqlAuthService(IDb db, ILogger<SqlAuthService> log) : IAuthS
         var unlocked = await db.ResultAsync<ProcResult>("dbo.usp_Auth_Session_Unlock",
             new { SessionKeyHash = SecureTokens.SessionKeyHash(sessionKey) }, ct);
         return new SignInOutcome(unlocked.Succeeded ? SignInStatus.Success : SignInStatus.InvalidCredentials, userId);
+    }
+
+    public async Task<string> RenewSessionAsync(long userId, long? tenantId, RequestInfo request, CancellationToken ct = default)
+    {
+        string sessionKey = SecureTokens.UrlToken();
+        await db.ResultAsync<ProcResult>("dbo.usp_Auth_Session_Create", new
+        {
+            UserId = userId,
+            TenantId = tenantId,
+            DeviceId = (long?)null,
+            SessionKeyHash = SecureTokens.SessionKeyHash(sessionKey),
+            AuthMethod = (byte)AuthMethod.Password,
+            request.IpAddress,
+            request.UserAgent,
+            LifetimeHours = SessionLifetimeHours,
+        }, ct);
+        return sessionKey;
     }
 
     public Task LockAsync(string sessionKey, CancellationToken ct = default) =>

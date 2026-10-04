@@ -32,6 +32,7 @@ public sealed class AccountTokens(IDb db)
     private sealed class ActiveRow : ProcResult
     {
         public byte[]? TokenSalt { get; init; }
+        public DateTime? IssuedAtUtc { get; init; }
     }
 
     public sealed class UserRow : ProcResult
@@ -79,6 +80,13 @@ public sealed class AccountTokens(IDb db)
     {
         var active = await db.SingleAsync<ActiveRow>("dbo.usp_Auth_Token_GetActive", new { UserId = userId, TokenType = (byte)type }, ct);
         return active is { Succeeded: true, TokenSalt: not null };
+    }
+
+    /// <summary>When the live token of this type was issued, or null if there isn't one.</summary>
+    public async Task<DateTime?> LiveIssuedAtAsync(long userId, TokenType type, CancellationToken ct)
+    {
+        var active = await db.SingleAsync<ActiveRow>("dbo.usp_Auth_Token_GetActive", new { UserId = userId, TokenType = (byte)type }, ct);
+        return active is { Succeeded: true, TokenSalt: not null } ? active.IssuedAtUtc : null;
     }
 
     public Task<UserRow?> UserByPublicIdAsync(Guid publicId, CancellationToken ct) =>
