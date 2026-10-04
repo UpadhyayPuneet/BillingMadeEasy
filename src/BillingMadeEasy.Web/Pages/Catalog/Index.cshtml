@@ -1,0 +1,49 @@
+@page
+@model BillingMadeEasy.Web.Pages.Catalog.IndexModel
+@{
+    ViewData["Title"] = "Catalog";
+    bool canAdd = Model.Can("Catalog.Offering.Manage");
+}
+<header class="page-head">
+    <div>
+        <h1>Catalog</h1>
+        <p class="muted">Everything you sell or buy. Search by name, code, HSN/SAC, brand or description.</p>
+    </div>
+    @if (canAdd)
+    {
+        <div class="actions">
+            <a class="btn primary" href="/Catalog/Item?type=product" data-key="n"><span class="ms" aria-hidden="true">add_box</span>New product <kbd>N</kbd></a>
+            <a class="btn" href="/Catalog/Item?type=service" data-key="N"><span class="ms" aria-hidden="true">add_task</span>New service <kbd>Shift N</kbd></a>
+        </div>
+    }
+</header>
+
+@if (Model.Flash is not null) { <div class="notice" role="status">@Model.Flash</div> }
+
+<div class="toolbar">
+    <nav class="segments" aria-label="Show">
+        <a href="@Model.Link(null)" aria-current="@(Model.TypeCode is null ? "page" : null)">All</a>
+        <a href="@Model.Link("product")" aria-current="@(Model.Type == "product" ? "page" : null)">Products</a>
+        <a href="@Model.Link("service")" aria-current="@(Model.Type == "service" ? "page" : null)">Services</a>
+        <a href="@Model.Link("expense")" aria-current="@(Model.Type == "expense" ? "page" : null)">Expenses</a>
+    </nav>
+    <a class="link small" href="@Model.Link(hidden: !Model.Hidden)">@(Model.Hidden ? "Hide hidden items" : "Show hidden items")</a>
+</div>
+
+<form method="get" class="search-row" data-live-search="/Catalog?handler=Rows" role="search">
+    @if (Model.Type is not null) { <input type="hidden" name="type" value="@Model.Type" /> }
+    @if (Model.Hidden) { <input type="hidden" name="hidden" value="true" /> }
+    <label class="search-field">
+        <span class="ms" aria-hidden="true">search</span>
+        <input type="search" name="q" value="@Model.Q" placeholder="Search items" autocomplete="off" spellcheck="false" autofocus aria-label="Search" />
+        <kbd>↓</kbd>
+    </label>
+</form>
+
+<div data-live-results>
+    <partial name="_ItemRows" model="Model" />
+</div>
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+}

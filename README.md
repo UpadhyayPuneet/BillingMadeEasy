@@ -98,3 +98,5 @@ so running one again does no harm.
 | `31_session_lock.sql` | Server-side screen lock |
 | `32_party_find_by_gstin.sql` | Duplicate-GSTIN check for new parties |
 | `33_party_brand_kit.sql` | Brand kit: dark-background logo, named colours, fonts, tagline, social handles, guidelines |
+| `34_catalog_defaults_and_customer_prices.sql` | GST rates (Sep 2025 slabs) and units with UQC for every business, new and existing; customer-specific prices |
+| `35_offering_barcode_check.sql` | A duplicate barcode is refused with the name of the item that has it |

@@ -1,3 +1,5 @@
+using System.Text.Encodings.Web;
+using System.Text.Unicode;
 using System.Threading.RateLimiting;
 using BillingMadeEasy.Core.Modules;
 using BillingMadeEasy.Core.Tenancy;
@@ -10,9 +12,14 @@ using BillingMadeEasy.Web.Modules;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.WebEncoders;
 
 var builder = WebApplication.CreateBuilder(args);
 var services = builder.Services;
+
+// ₹ and names in Hindi, Tamil or any script go out as written rather than as &#x…; entities.
+// Markup characters (< > & " ') are still escaped everywhere.
+services.Configure<WebEncoderOptions>(o => o.TextEncoderSettings = new TextEncoderSettings(UnicodeRanges.All));
 
 // ── Modules: each one registers itself; removing a line removes the module ──
 services.AddSingleton<IAppModule, EssentialsModule>();
@@ -38,6 +45,7 @@ else
     // Modules that read and write business data exist only when a database does.
     services.AddSingleton<IAppModule, PartiesModule>();
     services.AddSingleton<IAppModule, TeamModule>();
+    services.AddSingleton<IAppModule, CatalogModule>();
 }
 
 services.AddMemoryCache();
@@ -46,6 +54,7 @@ services.AddSingleton<EntitlementService>();
 services.AddScoped<NavigationService>();
 services.AddScoped<BillingMadeEasy.Web.Features.Parties.PartyStore>();
 services.AddScoped<BillingMadeEasy.Web.Features.Team.TeamStore>();
+services.AddScoped<BillingMadeEasy.Web.Features.Catalog.CatalogStore>();
 services.AddScoped<BillingMadeEasy.Web.Features.Team.InviteSender>();
 services.AddScoped<AccountTokens>();
 services.AddSingleton(builder.Configuration.GetSection("Storage").Get<BillingMadeEasy.Web.Infrastructure.Files.StorageOptions>() ?? new());

@@ -20,6 +20,9 @@ public static class AppClaims
 
     public static long? GetTenantId(this ClaimsPrincipal user) => ParseLong(user.FindFirst(TenantId)?.Value);
 
+    public static long GetTenantIdOrThrow(this ClaimsPrincipal user) =>
+        user.GetTenantId() ?? throw new InvalidOperationException("No business selected.");
+
     /// <summary>Permission codes are dotted (<c>Sales.Invoice.Issue</c>). <c>*</c> grants everything and is
     /// only ever issued to a tenant owner.</summary>
     public static bool HasPermission(this ClaimsPrincipal user, string code) =>

@@ -25,6 +25,8 @@ code, .mono { font-family: var(--font-mono); }
     font-family: "Material Symbols Rounded";
     font-weight: normal; font-style: normal; font-size: 20px; line-height: 1;
     display: inline-block; white-space: nowrap; direction: ltr;
+    /* One glyph wide even if the icon font is blocked, so a missing font can't push the layout sideways. */
+    width: 1em; overflow: hidden; flex-shrink: 0;
     -webkit-font-feature-settings: "liga"; font-feature-settings: "liga";
 }
 
@@ -126,7 +128,7 @@ kbd {
 
 /* ── Forms ── */
 .form { display: grid; gap: var(--space-4); }
-.field { display: grid; gap: 6px; font-weight: 500; }
+.field { display: grid; gap: 6px; font-weight: 500; align-content: start; }
 .field input, .field select, .field textarea {
     font: inherit; font-weight: 400; color: var(--text);
     padding: 10px 12px; border-radius: var(--radius-s);
@@ -416,3 +418,56 @@ fieldset.plain { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; 
 .brand-thumb { width: 40px; height: 40px; object-fit: contain; border: 1px solid var(--border); border-radius: var(--radius-s); background: #fff; padding: 3px; }
 .dots { display: flex; gap: 4px; margin-top: 6px; }
 .dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--border); }
+
+/* ── Catalogue ── */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.toolbar .search { flex: 1 1 260px; }
+.grid-table tr.inactive td { color: var(--text-2); }
+.grid-table tr.inactive td:first-child strong { text-decoration: line-through; text-decoration-color: var(--border); }
+.link { color: var(--accent); font-size: 13px; }
+
+.type-switch { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
+.type-option {
+    position: relative; display: grid; grid-template-columns: auto 1fr; column-gap: var(--space-2); align-items: center;
+    padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-m); cursor: pointer; background: var(--surface);
+}
+.type-option input { position: absolute; opacity: 0; pointer-events: none; }
+.type-option .ms { color: var(--text-2); grid-row: span 2; }
+.type-option .sub { grid-column: 2; }
+.type-option:hover { background: var(--surface-2); }
+.type-option:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.type-option:has(input:checked) .ms { color: var(--accent); }
+.type-option:has(input:focus-visible) { box-shadow: var(--focus); }
+fieldset:disabled .type-option { cursor: default; }
+
+.inline-add { display: flex; gap: var(--space-2); align-items: stretch; }
+.inline-add select { flex: 1; min-width: 0; }
+.muted-field select { opacity: .55; }
+
+.price-mode { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5, 24px); }
+.price-breakup, .margin-out { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5, 24px); align-items: flex-end; min-height: 1.5em; color: var(--text-2); font-size: 13px; }
+.price-breakup:empty, .margin-out:empty { min-height: 0; }
+.breakup-part { display: grid; gap: 2px; }
+.breakup-part .num { font-variant-numeric: tabular-nums; color: var(--text); font-size: 15px; }
+.breakup-part.strong .num { font-weight: 700; }
+.margin-out { padding-top: 18px; }
+.margin-out .sub { align-self: flex-end; }
+.margin-out.loss .breakup-part .num { color: var(--danger); }
+
+.flags { display: grid; gap: var(--space-2); }
+
+.lookup-list {
+    list-style: none; margin: 4px 0 0; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-m);
+    background: var(--surface); box-shadow: 0 8px 24px rgb(0 0 0 / .12); max-height: 260px; overflow: auto;
+}
+.lookup-list li { padding: 6px 10px; border-radius: var(--radius-s); cursor: pointer; display: flex; justify-content: space-between; gap: var(--space-3); }
+.lookup-list li[aria-selected="true"], .lookup-list li:hover { background: var(--accent-soft); }
+.lookup-list li.none { cursor: default; color: var(--text-2); background: none; }
+
+@media (max-width: 720px) {
+    .type-switch { grid-template-columns: 1fr; }
+}
+/* Phones: keyboard-shortcut help has nothing to offer on a touch screen, and the room goes to the business name. */
+@media (max-width: 480px) {
+    .topbar-actions [data-help] { display: none; }
+}

@@ -1,0 +1,71 @@
+@model BillingMadeEasy.Web.Pages.Catalog.IndexModel
+@using BillingMadeEasy.Web.Features.Catalog
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{ var r = Model.Result; }
+@if (r.Total == 0)
+{
+    <section class="empty">
+        <span class="ms empty-icon" aria-hidden="true">@(Model.Q is null ? "inventory_2" : "search_off")</span>
+        <h2>@(Model.Q is null ? "Nothing in the catalog yet" : $"Nothing matches “{Model.Q}”")</h2>
+        <p class="muted">Add what you sell once, with its price, GST rate and HSN or SAC code. Every invoice line then fills itself in.</p>
+        @if (Model.Can("Catalog.Offering.Manage"))
+        {
+            <a class="btn primary" href="/Catalog/Item?type=@(Model.Type ?? "product")@(Model.Q is null ? "" : "&name=" + Uri.EscapeDataString(Model.Q))">
+                <span class="ms" aria-hidden="true">add</span>@(Model.Q is null ? "Add an item" : $"Add “{Model.Q}”")
+            </a>
+        }
+    </section>
+}
+else
+{
+    <p class="result-count muted" aria-live="polite">@r.Total.ToString("N0") @(r.Total == 1 ? "item" : "items")</p>
+    <div class="table-wrap">
+        <table class="grid-table" data-row-nav>
+            <thead>
+                <tr>
+                    <th scope="col">Item</th>
+                    <th scope="col">HSN / SAC</th>
+                    <th scope="col">GST</th>
+                    @if (Model.CanSeePrices) { <th scope="col" class="num">Price</th> }
+                    <th scope="col">Unit</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var o in r.Rows)
+                {
+                    <tr data-href="/Catalog/Item/@o.OfferingId" tabindex="0" class="@(o.IsActive ? null : "inactive")">
+                        <td>
+                            <a href="/Catalog/Item/@o.OfferingId" class="row-link" tabindex="-1">@o.OfferingName</a>
+                            @if (!o.IsActive) { <span class="badge">Hidden</span> }
+                            @if (o.IsRecurring) { <span class="badge">Recurring</span> }
+                            <span class="sub">@string.Join(" · ", new[] { OfferingType.Label(o.OfferingType), o.OfferingCode, o.BrandName, o.CategoryName }.Where(x => !string.IsNullOrEmpty(x)))</span>
+                        </td>
+                        <td class="mono">@(o.HsnSacCode ?? "—")</td>
+                        <td>
+                            @if (o.IsPureAgent) { <span class="badge">Outside GST</span> }
+                            else if (o.TaxRateId is null) { <span class="badge warn">No GST rate</span> }
+                            else { <span>@o.TaxName</span> }
+                        </td>
+                        @if (Model.CanSeePrices)
+                        {
+                            <td class="num">
+                                @if (!o.HasPrice) { <span class="badge warn">No price</span> }
+                                else { <span>@Money.Inr(o.DefaultPrice)</span><span class="sub">@(o.IsPureAgent ? "at cost" : o.TaxRateId is null ? "" : o.IsPriceInclusive ? "incl. GST" : "+ GST")</span> }
+                                @if (o.PriceListCount > 0) { <span class="sub">@o.PriceListCount customer price@(o.PriceListCount == 1 ? "" : "s")</span> }
+                            </td>
+                        }
+                        <td>@o.UnitCode</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @if (r.Pages > 1)
+    {
+        <nav class="pager" aria-label="Pages">
+            @if (r.Page > 1) { <a href="@Model.Link(page: r.Page - 1)" rel="prev" data-key="[">‹ Previous <kbd>[</kbd></a> }
+            <span class="muted">Page @r.Page of @r.Pages</span>
+            @if (r.Page < r.Pages) { <a href="@Model.Link(page: r.Page + 1)" rel="next" data-key="]">Next › <kbd>]</kbd></a> }
+        </nav>
+    }
+}

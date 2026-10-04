@@ -1,0 +1,261 @@
+@page "{id:long?}"
+@model BillingMadeEasy.Web.Pages.Catalog.ItemModel
+@using BillingMadeEasy.Web.Features.Catalog
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{
+    var f = Model.Form;
+    string typeName = OfferingType.Label(f.OfferingType).ToLowerInvariant();
+    string title = Model.IsNew ? $"New {typeName}" : f.OfferingName;
+    ViewData["Title"] = title;
+    bool readOnly = !Model.CanEdit;
+    bool hidden = Model.Existing is { IsActive: false };
+}
+<header class="page-head">
+    <div>
+        <a class="back" href="/Catalog@(Model.IsNew ? "" : "?type=" + typeName)"><span class="ms" aria-hidden="true">arrow_back</span>Catalog <kbd>Esc</kbd></a>
+        <h1>@title @if (hidden) { <span class="badge warn">Hidden</span> }</h1>
+    </div>
+    @if (!Model.IsNew && Model.CanEdit)
+    {
+        <form method="post" asp-page-handler="Active">
+            @if (hidden) { <button class="btn" name="active" value="true"><span class="ms" aria-hidden="true">visibility</span>Restore</button> }
+            else { <button class="btn" name="active" value="false" data-confirm-click="Hide @f.OfferingName? It stops appearing on new invoices; past ones keep it."><span class="ms" aria-hidden="true">visibility_off</span>Hide</button> }
+        </form>
+    }
+</header>
+
+@if (Model.Flash is not null) { <div class="notice" role="status">@Model.Flash</div> }
+
+<form method="post" class="sheet-form" data-form novalidate autocomplete="off" data-item-form>
+    <div asp-validation-summary="ModelOnly" class="notice danger" role="alert"></div>
+    <fieldset class="plain" disabled="@readOnly">
+
+    <section class="form-card">
+        <div class="type-switch" role="radiogroup" aria-label="What is it">
+            @foreach (var (code, label, icon, hint) in new[] {
+                (OfferingType.Product, "Product", "category", "Goods you sell or stock"),
+                (OfferingType.Service, "Service", "design_services", "Work, hours, subscriptions"),
+                (OfferingType.Expense, "Expense", "receipt", "Things you buy to run the business") })
+            {
+                <label class="type-option">
+                    <input type="radio" name="Form.OfferingType" value="@code" checked="@(f.OfferingType == code)" data-type-radio />
+                    <span class="ms" aria-hidden="true">@icon</span>
+                    <strong>@label</strong>
+                    <span class="sub">@hint</span>
+                </label>
+            }
+        </div>
+
+        <div class="fields two">
+            <label class="field span-2">
+                <span>Name <span class="req" aria-hidden="true">*</span></span>
+                <input asp-for="Form.OfferingName" autofocus="@Model.IsNew" placeholder="What appears on the invoice" />
+                <span asp-validation-for="Form.OfferingName" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>Code / SKU</span>
+                <input asp-for="Form.OfferingCode" class="mono" placeholder="Your own reference" />
+                <span asp-validation-for="Form.OfferingCode" class="field-error"></span>
+            </label>
+            <label class="field" data-for-type="1">
+                <span>Brand</span>
+                <input asp-for="Form.BrandName" list="brand-suggestions" data-brand-lookup="/api/catalog/brands?q=" placeholder="MRF, Bosch…" />
+                <datalist id="brand-suggestions"></datalist>
+                <span class="field-help" data-brand-hint></span>
+            </label>
+            <label class="field">
+                <span>Category</span>
+                <span class="inline-add">
+                    <select asp-for="Form.CategoryId" data-category-select>
+                        <option value="">None</option>
+                        @foreach (var c in Model.Categories) { <option value="@c.CategoryId">@c.CategoryName</option> }
+                    </select>
+                    @if (Model.CanEdit) { <button type="button" class="btn small" data-add-category="/Catalog/Item?handler=Category" title="Add a category">+ New</button> }
+                </span>
+            </label>
+            <label class="field span-2">
+                <span>Description <span class="muted small">printed under the name on invoices</span></span>
+                <textarea asp-for="Form.Description" rows="2" placeholder="Size, model, what's included"></textarea>
+            </label>
+        </div>
+    </section>
+
+    <section class="form-card">
+        <h2>Tax</h2>
+        <div class="fields two">
+            <label class="field">
+                <span data-for-type="1">HSN code</span><span data-for-type="2,3">SAC code</span>
+                <input asp-for="Form.HsnSacCode" class="mono" inputmode="numeric" maxlength="12" data-hsn />
+                <span class="field-help" data-hsn-help>Required on invoices for most businesses; e-invoices need 6 digits.</span>
+                <span asp-validation-for="Form.HsnSacCode" class="field-error"></span>
+            </label>
+            <label class="field" data-gst-rate>
+                <span>GST rate</span>
+                <select asp-for="Form.TaxRateId" data-tax-select>
+                    <option value="" data-rate="0">Not set</option>
+                    @foreach (var t in Model.TaxRates) { <option value="@t.TaxRateId" data-rate="@t.RatePercent.ToString(System.Globalization.CultureInfo.InvariantCulture)">@t.TaxName</option> }
+                </select>
+                <span asp-validation-for="Form.TaxRateId" class="field-error"></span>
+            </label>
+            <label class="check span-2" data-for-type="2">
+                <input asp-for="Form.IsPureAgent" data-pure-agent />
+                <span>Pure-agent reimbursement <span class="muted small">— an expense you paid on the client's behalf (e.g. a government fee) and recover at cost. It stays outside GST.</span></span>
+            </label>
+            <span asp-validation-for="Form.IsPureAgent" class="field-error span-2"></span>
+        </div>
+    </section>
+
+    @if (Model.CanSeePrice)
+    {
+        <section class="form-card">
+            <h2>Price</h2>
+            <div class="fields two">
+                <label class="field">
+                    <span>Selling price (₹)</span>
+                    <input asp-for="Form.DefaultPrice" type="text" inputmode="decimal" data-amount data-price disabled="@(!Model.CanEditPrice)" placeholder="0" />
+                    <span asp-validation-for="Form.DefaultPrice" class="field-error"></span>
+                </label>
+                <label class="field">
+                    <span>Unit</span>
+                    <select asp-for="Form.UnitId">
+                        <option value="">Not set</option>
+                        @foreach (var u in Model.Units) { <option value="@u.UnitId">@u.UnitName (@u.UnitCode)@(u.UqcCode is null or "OTH" ? "" : " · " + u.UqcCode)</option> }
+                    </select>
+                </label>
+                <div class="span-2 price-mode" role="radiogroup" aria-label="Is GST included in this price">
+                    <label class="check"><input type="radio" name="Form.IsPriceInclusive" value="false" checked="@(!f.IsPriceInclusive)" disabled="@(!Model.CanEditPrice)" data-inclusive /> <span>GST is added on top</span></label>
+                    <label class="check"><input type="radio" name="Form.IsPriceInclusive" value="true" checked="@f.IsPriceInclusive" disabled="@(!Model.CanEditPrice)" data-inclusive /> <span>Price already includes GST <span class="muted small">(MRP, counter sales)</span></span></label>
+                </div>
+                <output class="span-2 price-breakup" data-price-breakup aria-live="polite"></output>
+                @if (Model.CanSeeCost)
+                {
+                    <label class="field">
+                        <span>Cost (₹, before GST) <span class="muted small">only people allowed to see costs</span></span>
+                        <input asp-for="Form.DefaultCost" type="text" inputmode="decimal" data-amount data-cost placeholder="What you pay" />
+                        <span asp-validation-for="Form.DefaultCost" class="field-error"></span>
+                    </label>
+                    <output class="field margin-out" data-margin aria-live="polite"></output>
+                }
+            </div>
+        </section>
+    }
+
+    <section class="form-card">
+        <h2>How it's used</h2>
+        <div class="flags">
+            <label class="check"><input asp-for="Form.IsSellable" /> <span>You sell it <span class="muted small">— shows on invoices and quotations</span></span></label>
+            <label class="check"><input asp-for="Form.IsPurchasable" /> <span>You buy it <span class="muted small">— shows on purchase bills</span></span></label>
+            <label class="check" data-for-type="2"><input asp-for="Form.IsRecurring" /> <span>Billed repeatedly <span class="muted small">— can be put on a subscription (monthly retainers, AMC)</span></span></label>
+            <span asp-validation-for="Form.IsSellable" class="field-error"></span>
+        </div>
+    </section>
+
+    <section class="form-card" data-for-type="1">
+        <h2>Product details</h2>
+        <div class="fields two">
+            <label class="field">
+                <span>Barcode</span>
+                <input asp-for="Form.Barcode" class="mono" data-barcode placeholder="Scan or type" />
+                <span class="field-help">A scanner works here; its Enter won't submit the form.</span>
+                <span asp-validation-for="Form.Barcode" class="field-error"></span>
+            </label>
+            <label class="field"><span>Pack size</span><input asp-for="Form.PackSize" placeholder="145/80 R12, 1 L, 10 × 1 kg" /></label>
+            <label class="check span-2"><input asp-for="Form.TracksStock" data-reveal="#reorder" /> <span>Track stock for this item</span></label>
+            <div id="reorder" class="span-2 fields two reveal">
+                <label class="field">
+                    <span>Reorder at</span>
+                    <input asp-for="Form.ReorderLevel" type="text" inputmode="decimal" placeholder="Warn when stock falls to" />
+                    <span asp-validation-for="Form.ReorderLevel" class="field-error"></span>
+                </label>
+            </div>
+        </div>
+    </section>
+
+    </fieldset>
+    @if (Model.CanEdit)
+    {
+        <footer class="action-bar">
+            <a class="btn" href="/Catalog" data-cancel>Cancel <kbd>Esc</kbd></a>
+            <button type="submit" class="btn primary">@(Model.IsNew ? $"Add {typeName}" : "Save") <kbd>Ctrl Enter</kbd></button>
+        </footer>
+    }
+</form>
+
+@if (!Model.IsNew && Model.CanSeePrice)
+{
+    <section class="card section" id="customer-prices">
+        <header class="card-head">
+            <h2>Customer prices <span class="count">@Model.CustomerPrices.Count</span></h2>
+            @if (Model.CanEditPrice) { <button type="button" class="btn small" data-dialog="price" data-key="p"><span class="ms" aria-hidden="true">add</span>Customer price <kbd>P</kbd></button> }
+        </header>
+        <p class="muted small">Agreed rates for particular customers, and quantity breaks. An invoice for them picks these up and says where the price came from.</p>
+        @if (Model.CustomerPrices.Count == 0)
+        {
+            <p class="empty-inline">Everyone pays the standard price@(f.DefaultPrice is null ? "" : $" of {Money.Inr(f.DefaultPrice)}").</p>
+        }
+        else
+        {
+            <ul class="item-list">
+                @foreach (var cp in Model.CustomerPrices)
+                {
+                    <li>
+                        <div class="item-main">
+                            <a href="/Parties/View/@cp.PartyId"><strong>@cp.PartyName</strong></a>
+                            <span class="sub">
+                                @(cp.Price is not null ? Money.Inr(cp.Price) : $"{cp.DiscountPercent:0.##}% off the standard price")
+                                @(cp.MinQuantity > 1 ? $" · from {cp.MinQuantity:0.##} units" : "")
+                                · set @When.Ago(cp.UpdatedAtUtc ?? cp.CreatedAtUtc)
+                            </span>
+                        </div>
+                        @if (Model.CanEditPrice)
+                        {
+                            <form method="post" asp-page-handler="RemovePrice" data-confirm="Remove @cp.PartyName's price?">
+                                <input type="hidden" name="itemId" value="@cp.PriceListItemId" />
+                                <button type="submit" class="icon-btn" aria-label="Remove"><span class="ms" aria-hidden="true">delete</span></button>
+                            </form>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+
+    <dialog id="dlg-price" class="dialog" aria-labelledby="dlg-price-title">
+        <form method="post" asp-page-handler="CustomerPrice" class="dialog-form" novalidate autocomplete="off">
+            <h2 id="dlg-price-title" data-new-title="Customer price" data-edit-title="Customer price">Customer price</h2>
+            <input type="hidden" name="Price.Id" value="0" />
+            <div class="fields two">
+                <label class="field span-2">
+                    <span>Customer</span>
+                    <input type="text" data-party-lookup="/Catalog/Item/@Model.Id?handler=Customers&q=" placeholder="Start typing a name" aria-autocomplete="list" required />
+                    <input type="hidden" name="partyId" data-party-id />
+                    <ul class="lookup-list" data-party-results role="listbox" hidden></ul>
+                </label>
+                <label class="field">
+                    <span>Price (₹)</span>
+                    <input type="text" name="price" inputmode="decimal" data-amount placeholder="@(f.DefaultPrice is null ? "Agreed price" : "Standard " + Money.Plain(f.DefaultPrice))" />
+                </label>
+                <label class="field">
+                    <span>or discount %</span>
+                    <input type="text" name="discountPercent" inputmode="decimal" placeholder="e.g. 10" />
+                </label>
+                <label class="field">
+                    <span>From quantity</span>
+                    <input type="text" name="minQuantity" inputmode="decimal" value="1" />
+                    <span class="field-help">Use 10 for "10 or more" bulk rates.</span>
+                </label>
+            </div>
+            <footer class="dialog-actions">
+                <button type="button" class="btn" data-close>Cancel <kbd>Esc</kbd></button>
+                <button type="submit" class="btn primary">Save <kbd>Ctrl Enter</kbd></button>
+            </footer>
+        </form>
+    </dialog>
+}
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+    <script src="~/js/form.js" asp-append-version="true"></script>
+    <script src="~/js/dialogs.js" asp-append-version="true"></script>
+    <script src="~/js/item.js" asp-append-version="true"></script>
+}
