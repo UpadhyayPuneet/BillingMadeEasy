@@ -18,6 +18,7 @@
     var commands = readJson('bme-commands', []).concat([
         { title: 'Switch business', href: '/Account/ChooseBusiness', icon: 'swap_horiz', group: 'Account', keywords: 'tenant company workspace change' },
         { title: 'Switch theme', action: 'theme', icon: 'contrast', group: 'Account', keywords: 'dark light mode' },
+        { title: 'Lock screen', href: '/Account/Unlock', icon: 'lock', group: 'Account', keywords: 'lock away break secure', key: 'Ctrl Shift L' },
         { title: 'Keyboard shortcuts', action: 'help', icon: 'keyboard', group: 'Help', keywords: 'keys hotkeys help' },
         { title: 'Sign out', action: 'signout', icon: 'logout', group: 'Account', keywords: 'logout exit' }
     ]);
@@ -206,17 +207,24 @@
         var ctrl = e.ctrlKey || e.metaKey;
 
         if (ctrl && e.shiftKey && e.code === 'Space') { e.preventDefault(); listen(); return; }
+        if (ctrl && e.shiftKey && (e.key === 'L' || e.key === 'l')) {
+            e.preventDefault();
+            location.href = '/Account/Unlock?ReturnUrl=' + encodeURIComponent(location.pathname + location.search);
+            return;
+        }
         if (ctrl && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); palette && !palette.hidden ? closeAll() : openPalette(); return; }
         if (e.key === 'Escape') { closeAll(); return; }
         if (ctrl || e.altKey || typing(e.target)) return;
 
         if (chord === 'g') {
+            // The second key of a chord belongs to the chord, not to the page's own shortcuts.
+            e.stopImmediatePropagation();
             chord = null; clearTimeout(chordTimer);
             var target = commands.filter(function (c) { return c.shortcut === e.key.toLowerCase(); })[0];
             if (target) { e.preventDefault(); run(target); }
             return;
         }
-        if (e.key === 'g') { chord = 'g'; chordTimer = setTimeout(function () { chord = null; }, 1200); return; }
+        if (e.key === 'g') { e.stopImmediatePropagation(); chord = 'g'; chordTimer = setTimeout(function () { chord = null; }, 1200); return; }
         if (e.key === '/') { e.preventDefault(); openPalette(); return; }
         if (e.key === '?') { e.preventDefault(); showHelp(); return; }
     });

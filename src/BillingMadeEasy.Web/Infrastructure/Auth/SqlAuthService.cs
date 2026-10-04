@@ -146,6 +146,9 @@ public sealed class SqlAuthService(IDb db, ILogger<SqlAuthService> log) : IAuthS
         return new SignInOutcome(unlocked.Succeeded ? SignInStatus.Success : SignInStatus.InvalidCredentials, userId);
     }
 
+    public Task LockAsync(string sessionKey, CancellationToken ct = default) =>
+        db.ResultAsync<ProcResult>("dbo.usp_Auth_Session_Lock", new { SessionKeyHash = SecureTokens.SessionKeyHash(sessionKey) }, ct);
+
     public Task SignOutAsync(string sessionKey, CancellationToken ct = default) =>
         db.ResultAsync<ProcResult>("dbo.usp_Auth_Session_End",
             new { SessionKeyHash = SecureTokens.SessionKeyHash(sessionKey), UserId = (long?)null, EndReason = (byte)SessionEndReason.SignedOut }, ct);

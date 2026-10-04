@@ -1,9 +1,10 @@
+using System.Text.RegularExpressions;
 using System.Net;
 using System.Security.Cryptography;
-using System.Text.RegularExpressions;
 using BillingMadeEasy.Core.Modules;
 using BillingMadeEasy.Core.Security;
 using BillingMadeEasy.Data;
+using static BillingMadeEasy.Tests.Sql.WebFlow;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -169,6 +170,25 @@ public class SqlSignInTests(SqlDatabaseFixture db) : IClassFixture<SqlDatabaseFi
     }
 
     [SqlFact]
+    public async Task Opening_the_lock_screen_locks_the_session_on_the_server()
+    {
+        string email = await SoloOwnerAsync();
+        var client = Client();
+        await SignIn(client, email, SqlDatabaseFixture.Password);
+
+        // What the page's idle timer and Ctrl+Shift+L do.
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/Account/Unlock?ReturnUrl=%2FPlan")).StatusCode);
+
+        // Walking away from the lock screen without the password gets nowhere.
+        Assert.StartsWith("/Account/Unlock", (await client.GetAsync("/Plan")).Location());
+
+        string token = await Token(client, "/Account/Unlock");
+        var unlocked = await client.PostAsync("/Account/Unlock?ReturnUrl=%2FPlan", Form(token, new() { ["Password"] = SqlDatabaseFixture.Password }));
+        Assert.Equal("/Plan", unlocked.Location());
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/Plan")).StatusCode);
+    }
+
+    [SqlFact]
     public async Task A_weaker_stored_hash_is_upgraded_silently_at_sign_in()
     {
         byte[] salt = RandomNumberGenerator.GetBytes(16);
@@ -229,40 +249,6 @@ public class SqlSignInTests(SqlDatabaseFixture db) : IClassFixture<SqlDatabaseFi
         Assert.Equal("start", (await store.GetAsync(trial)).PlanCode);
     }
 
-    private static async Task<HttpResponseMessage> SignIn(HttpClient client, string identifier, string password) =>
-        await client.PostAsync("/Account/SignIn", Form(await Token(client, "/Account/SignIn"), new()
-        {
-            ["Identifier"] = identifier,
-            ["Password"] = password,
-        }));
-
-    private static async Task<HttpResponseMessage> Choose(HttpClient client, long tenantId) =>
-        await client.PostAsync("/Account/ChooseBusiness", Form(await Token(client, "/Account/ChooseBusiness"), new() { ["tenantId"] = tenantId.ToString() }));
-
-    private static FormUrlEncodedContent Form(string token, Dictionary<string, string> fields)
-    {
-        fields["__RequestVerificationToken"] = token;
-        return new FormUrlEncodedContent(fields);
-    }
-
-    private static async Task<string> Token(HttpClient client, string path)
-    {
-        string html = await client.GetStringAsync(path);
-        var match = Regex.Match(html, "name=\"__RequestVerificationToken\" type=\"hidden\" value=\"([^\"]+)\"");
-        Assert.True(match.Success, $"No antiforgery token on {path}");
-        return match.Groups[1].Value;
-    }
-
     private static string AuthCookie(HttpResponseMessage response) =>
         response.Headers.GetValues("Set-Cookie").First(c => c.StartsWith("bme.auth=")).Split(';')[0];
-}
-
-internal static class RedirectExtensions
-{
-    /// <summary>Redirect target as a local path, whether the server sent it absolute or relative.</summary>
-    public static string Location(this HttpResponseMessage response)
-    {
-        var uri = response.Headers.Location ?? throw new InvalidOperationException($"Expected a redirect, got {(int)response.StatusCode}.");
-        return uri.IsAbsoluteUri ? uri.PathAndQuery : uri.OriginalString;
-    }
 }

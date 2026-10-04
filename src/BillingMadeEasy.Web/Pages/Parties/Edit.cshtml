@@ -1,0 +1,174 @@
+@page "{id:long?}"
+@model BillingMadeEasy.Web.Pages.Parties.EditModel
+@using BillingMadeEasy.Core.Parties
+@{
+    string heading = Model.IsNew
+        ? (Model.Form.IsSupplier && !Model.Form.IsCustomer ? "New supplier" : "New customer")
+        : "Edit " + (Model.Form.DisplayName ?? Model.Form.LegalName);
+    ViewData["Title"] = heading;
+    string backUrl = Model.IsNew ? "/Parties" : $"/Parties/View/{Model.Id}";
+}
+<header class="page-head">
+    <div>
+        <a class="back" href="@backUrl"><span class="ms" aria-hidden="true">arrow_back</span>Back <kbd>Esc</kbd></a>
+        <h1>@heading</h1>
+    </div>
+</header>
+
+<form method="post" class="sheet-form" data-form novalidate autocomplete="off">
+    <input type="hidden" asp-for="Id" />
+    <div asp-validation-summary="ModelOnly" class="notice danger" role="alert"></div>
+
+    @if (Model.IsNew)
+    {
+        <section class="form-card">
+            <h2>GST registration <span class="muted small">optional</span></h2>
+            <p class="muted small">Type the GSTIN first: the PAN and state fill themselves in, and the branch is created with it.</p>
+            <div class="fields two">
+                <label class="field">
+                    <span>GSTIN</span>
+                    <input asp-for="Form.Gstin" class="mono upper" autofocus maxlength="15" spellcheck="false" data-gstin data-gstin-pan="#Form_TaxIdNumber" data-gstin-state="#Form_StateCode" data-gstin-owner="/Parties/Edit?handler=GstinOwner&gstin=" />
+                    <span class="field-help" data-gstin-result aria-live="polite"></span>
+                    <span asp-validation-for="Form.Gstin" class="field-error"></span>
+                    @if (Model.ExistingOwner is { } owner)
+                    {
+                        <a class="field-link" href="/Parties/View/@owner.PartyId">Open @owner.DisplayName →</a>
+                    }
+                </label>
+                <label class="field">
+                    <span>State</span>
+                    <select asp-for="Form.StateCode">
+                        <option value="">Select</option>
+                        @foreach (var s in Model.States) { <option value="@s.StateCode">@s.StateName (@s.StateCode)</option> }
+                    </select>
+                </label>
+                <label class="field span-2">
+                    <span>Address</span>
+                    <input asp-for="Form.AddressLine1" placeholder="Building, street, area" />
+                </label>
+                <label class="field">
+                    <span>City</span>
+                    <input asp-for="Form.City" />
+                </label>
+                <label class="field">
+                    <span>PIN code</span>
+                    <input asp-for="Form.PostalCode" inputmode="numeric" maxlength="6" />
+                </label>
+            </div>
+        </section>
+    }
+
+    <section class="form-card">
+        <h2>Who they are</h2>
+        <div class="fields two">
+            <label class="field span-2">
+                <span>Name <span class="req" aria-hidden="true">*</span></span>
+                <input asp-for="Form.LegalName" autofocus="@(!Model.IsNew)" placeholder="Legal name as on GST / PAN" />
+                <span asp-validation-for="Form.LegalName" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>Short name <span class="muted small">shown in lists</span></span>
+                <input asp-for="Form.DisplayName" placeholder="Same as name" />
+            </label>
+            <label class="field">
+                <span>Trading as</span>
+                <input asp-for="Form.TradingName" />
+            </label>
+            <label class="field">
+                <span>Type</span>
+                <select asp-for="Form.PartyType">
+                    @foreach (var t in PartyCodes.PartyTypes) { <option value="@t.Code">@t.Label</option> }
+                </select>
+            </label>
+            <label class="field">
+                <span>PAN</span>
+                <input asp-for="Form.TaxIdNumber" class="mono upper" maxlength="10" spellcheck="false" />
+                <span asp-validation-for="Form.TaxIdNumber" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>Code <span class="muted small">your own reference</span></span>
+                <input asp-for="Form.PartyCode" class="mono" />
+                <span asp-validation-for="Form.PartyCode" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>Category</span>
+                <select asp-for="Form.CategoryId">
+                    <option value="">None</option>
+                    @foreach (var c in Model.Categories) { <option value="@c.Id">@c.Name</option> }
+                </select>
+            </label>
+        </div>
+    </section>
+
+    <section class="form-card">
+        <h2>How they deal with you</h2>
+        <span asp-validation-for="Form.IsCustomer" class="field-error block"></span>
+        <div class="role-grid">
+            <fieldset class="role @(Model.CanCustomer ? null : "readonly")" disabled="@(!Model.CanCustomer)">
+                <label class="check strong"><input asp-for="Form.IsCustomer" data-reveal="#customer-terms" /> <span>Customer</span></label>
+                <div id="customer-terms" class="fields two reveal">
+                    <label class="field">
+                        <span>Credit days</span>
+                        <input asp-for="Form.CustomerTermDays" inputmode="numeric" placeholder="Due on receipt" />
+                        <span asp-validation-for="Form.CustomerTermDays" class="field-error"></span>
+                    </label>
+                    <label class="field">
+                        <span>Credit limit (₹)</span>
+                        <input asp-for="Form.CustomerCreditLimit" type="text" inputmode="decimal" placeholder="No limit" data-amount />
+                        <span asp-validation-for="Form.CustomerCreditLimit" class="field-error"></span>
+                    </label>
+                    <label class="field">
+                        <span>Opening balance (₹) <span class="muted small">they owe you</span></span>
+                        <input asp-for="Form.CustomerOpening" type="text" inputmode="decimal" data-amount />
+                    </label>
+                </div>
+            </fieldset>
+            <fieldset class="role @(Model.CanSupplier ? null : "readonly")" disabled="@(!Model.CanSupplier)">
+                <label class="check strong"><input asp-for="Form.IsSupplier" data-reveal="#supplier-terms" /> <span>Supplier</span></label>
+                <div id="supplier-terms" class="fields two reveal">
+                    <label class="field">
+                        <span>Payment days</span>
+                        <input asp-for="Form.SupplierTermDays" inputmode="numeric" placeholder="Due on receipt" />
+                        <span asp-validation-for="Form.SupplierTermDays" class="field-error"></span>
+                    </label>
+                    <label class="field">
+                        <span>Opening balance (₹) <span class="muted small">you owe them</span></span>
+                        <input asp-for="Form.SupplierOpening" type="text" inputmode="decimal" data-amount />
+                    </label>
+                </div>
+            </fieldset>
+        </div>
+    </section>
+
+    <section class="form-card">
+        <h2>Reaching them</h2>
+        <div class="fields two">
+            <label class="field">
+                <span>Phone</span>
+                <input asp-for="Form.Phone" type="tel" inputmode="tel" />
+            </label>
+            <label class="field">
+                <span>Email</span>
+                <input asp-for="Form.Email" type="email" inputmode="email" />
+                <span asp-validation-for="Form.Email" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>Website</span>
+                <input asp-for="Form.Website" inputmode="url" />
+            </label>
+            <label class="field span-2">
+                <span>Notes</span>
+                <textarea asp-for="Form.Notes" rows="3"></textarea>
+            </label>
+        </div>
+    </section>
+
+    <footer class="action-bar">
+        <a class="btn" href="@backUrl" data-cancel>Cancel <kbd>Esc</kbd></a>
+        <button type="submit" class="btn primary">@(Model.IsNew ? "Add" : "Save") <kbd>Ctrl Enter</kbd></button>
+    </footer>
+</form>
+
+@section Scripts {
+    <script src="~/js/form.js" asp-append-version="true"></script>
+}

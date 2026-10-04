@@ -21,7 +21,12 @@ public sealed class UnlockModel(IAuthService auth) : PageModel
 
     public string Name => User.FindFirstValue(ClaimTypes.Name) ?? "";
 
-    public void OnGet() { }
+    /// <summary>Arriving here locks the session server-side, so leaving without the password gets nowhere.</summary>
+    public async Task OnGetAsync(CancellationToken ct)
+    {
+        if (User.FindFirst(AppClaims.SessionKey)?.Value is { } sessionKey)
+            await auth.LockAsync(sessionKey, ct);
+    }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken ct)
     {

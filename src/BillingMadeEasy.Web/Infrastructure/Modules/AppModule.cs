@@ -3,6 +3,7 @@ using BillingMadeEasy.Core.Tenancy;
 
 namespace BillingMadeEasy.Web.Infrastructure.Modules;
 
+/// <param name="Permission">Needed to see the entry; several codes separated by <c>|</c> mean any of them.</param>
 /// <param name="Shortcut">Two-key "go to" chord after <c>g</c>, e.g. <c>d</c> for g→d.</param>
 /// <param name="Keywords">Extra words the command bar matches (synonyms people actually type).</param>
 public sealed record NavItem(
@@ -29,6 +30,9 @@ public interface IAppModule
     IEnumerable<NavItem> Navigation { get; }
 
     void MapEndpoints(IEndpointRouteBuilder api);
+
+    /// <summary>Permission rules for this module's pages (module gating is applied automatically).</summary>
+    void ConfigurePages(Microsoft.AspNetCore.Mvc.ApplicationModels.PageConventionCollection conventions) { }
 }
 
 public sealed class NavigationService(IEnumerable<IAppModule> modules, EntitlementService entitlements)
@@ -41,7 +45,7 @@ public sealed class NavigationService(IEnumerable<IAppModule> modules, Entitleme
         return modules
             .Where(m => enabled.Contains(m.Key))
             .SelectMany(m => m.Navigation)
-            .Where(n => n.Permission is null || user.HasPermission(n.Permission))
+            .Where(n => n.Permission is null || n.Permission.Split('|').Any(user.HasPermission))
             .ToList();
     }
 }

@@ -58,5 +58,8 @@ public interface IAuthService
 
     Task<SignInOutcome> UnlockAsync(string sessionKey, long userId, string password, RequestInfo request, CancellationToken ct = default);
 
+    /// <summary>Locks the session now; it stays locked until the password is entered.</summary>
+    Task LockAsync(string sessionKey, CancellationToken ct = default);
+
     Task SignOutAsync(string sessionKey, CancellationToken ct = default);
 }

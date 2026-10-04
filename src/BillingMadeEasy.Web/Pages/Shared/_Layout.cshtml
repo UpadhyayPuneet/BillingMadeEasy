@@ -83,6 +83,7 @@
             <dl class="keys">
                 <dt><kbd>Ctrl</kbd> <kbd>K</kbd> or <kbd>/</kbd></dt><dd>Command bar: go anywhere, find anything</dd>
                 <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Space</kbd></dt><dd>Speak a command</dd>
+                <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>L</kbd></dt><dd>Lock the screen</dd>
                 @foreach (var item in nav.Where(n => n.Shortcut is not null))
                 {
                     <dt><kbd>g</kbd> then <kbd>@item.Shortcut</kbd></dt><dd>@item.Title</dd>
@@ -96,6 +97,8 @@
 
     <script type="application/json" id="bme-commands">@Html.Raw(JsonSerializer.Serialize(commands))</script>
     <script type="application/json" id="bme-scope">@Html.Raw(JsonSerializer.Serialize(scope))</script>
+    <script type="application/json" id="bme-idle">@BillingMadeEasy.Web.Infrastructure.Auth.SessionValidation.IdleLockMinutes(Context)</script>
+    <script src="~/js/idle.js" asp-append-version="true"></script>
     <script src="~/js/keys.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>

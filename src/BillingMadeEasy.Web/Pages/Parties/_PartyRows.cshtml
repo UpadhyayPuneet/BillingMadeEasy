@@ -1,0 +1,84 @@
+@model BillingMadeEasy.Web.Pages.Parties.IndexModel
+@using BillingMadeEasy.Core.Parties
+@{
+    var result = Model.Result;
+    string newRole = Model.RoleType == PartyCodes.RoleSupplier ? "supplier" : "customer";
+    bool canCreate = Model.Can(newRole == "supplier" ? "Party.Supplier.Manage" : "Party.Customer.Manage");
+}
+@if (result.Total == 0)
+{
+    <section class="empty">
+        @if (Model.Q is null)
+        {
+            <span class="ms empty-icon" aria-hidden="true">groups</span>
+            <h2>No @Model.Title.ToLowerInvariant() yet</h2>
+            <p class="muted">Add the people and businesses you bill or buy from. A GSTIN fills in the PAN and state for you.</p>
+        }
+        else
+        {
+            <span class="ms empty-icon" aria-hidden="true">search_off</span>
+            <h2>Nothing matches “@Model.Q”</h2>
+            <p class="muted">Try fewer letters, or part of the GSTIN or phone number.</p>
+        }
+        @if (canCreate)
+        {
+            <a class="btn primary" href="/Parties/Edit?role=@newRole@(Model.Q is null ? "" : "&name=" + Uri.EscapeDataString(Model.Q))">
+                <span class="ms" aria-hidden="true">add</span>@(Model.Q is null ? $"Add a {newRole}" : $"Add “{Model.Q}” as a {newRole}")
+            </a>
+        }
+    </section>
+}
+else
+{
+    <p class="result-count muted" aria-live="polite">@result.Total.ToString("N0") @(result.Total == 1 ? "match" : "matches")</p>
+    <div class="table-wrap">
+        <table class="grid-table" data-row-nav>
+            <thead>
+                <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">PAN</th>
+                    <th scope="col">City</th>
+                    <th scope="col">Contact</th>
+                    <th scope="col" class="num">Branches</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in result.Rows)
+                {
+                    <tr data-href="/Parties/View/@p.PartyId" tabindex="0">
+                        <td>
+                            <a href="/Parties/View/@p.PartyId" class="row-link" tabindex="-1">@p.DisplayName</a>
+                            @if (!string.Equals(p.DisplayName, p.LegalName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                <span class="sub">@p.LegalName</span>
+                            }
+                            @if (p.PartyCode is not null) { <span class="sub mono">@p.PartyCode</span> }
+                        </td>
+                        <td>
+                            @if (p.IsCustomer) { <span class="badge">Customer</span> }
+                            @if (p.IsSupplier) { <span class="badge">Supplier</span> }
+                            @if (p.Status != PartyCodes.StatusActive) { <span class="badge warn">@PartyCodes.Status(p.Status)</span> }
+                            else if (p.IsBlocked) { <span class="badge warn">Blocked</span> }
+                        </td>
+                        <td class="mono">@p.TaxIdNumber</td>
+                        <td>@p.PrimaryCity</td>
+                        <td>
+                            @if (p.Phone is not null) { <span>@p.Phone</span> }
+                            @if (p.Email is not null) { <span class="sub">@p.Email</span> }
+                        </td>
+                        <td class="num">@(p.LocationCount == 0 ? "—" : p.LocationCount)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @if (result.Pages > 1)
+    {
+        <nav class="pager" aria-label="Pages">
+            @if (result.Page > 1) { <a href="@Model.PageUrl(result.Page - 1)" rel="prev" data-key="[">‹ Previous <kbd>[</kbd></a> }
+            <span class="muted">Page @result.Page of @result.Pages</span>
+            @if (result.Page < result.Pages) { <a href="@Model.PageUrl(result.Page + 1)" rel="next" data-key="]">Next › <kbd>]</kbd></a> }
+        </nav>
+    }
+}

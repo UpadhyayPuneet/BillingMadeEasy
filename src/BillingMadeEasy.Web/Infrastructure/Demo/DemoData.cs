@@ -62,6 +62,8 @@ public sealed class DemoAuthService : IAuthService
     public Task<SignInOutcome> UnlockAsync(string sessionKey, long userId, string password, RequestInfo request, CancellationToken ct = default) =>
         Task.FromResult(new SignInOutcome(PasswordHasher.Verify(password, DemoData.PasswordHash) ? SignInStatus.Success : SignInStatus.InvalidCredentials, userId));
 
+    public Task LockAsync(string sessionKey, CancellationToken ct = default) => Task.CompletedTask;
+
     public Task SignOutAsync(string sessionKey, CancellationToken ct = default) => Task.CompletedTask;
 }
 

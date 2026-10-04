@@ -1,0 +1,51 @@
+@page
+@model BillingMadeEasy.Web.Pages.Parties.IndexModel
+@{
+    ViewData["Title"] = Model.Title;
+    string? newRole = Model.RoleType switch { 1 => "customer", 2 => "supplier", _ => null };
+    bool canCustomer = Model.Can("Party.Customer.Manage");
+    bool canSupplier = Model.Can("Party.Supplier.Manage");
+}
+<header class="page-head">
+    <div>
+        <h1>@Model.Title</h1>
+        <p class="muted">Search by name, code, PAN, GSTIN, phone or email.</p>
+    </div>
+    <div class="actions">
+        @if (canCustomer && newRole != "supplier")
+        {
+            <a class="btn primary" href="/Parties/Edit?role=customer" data-key="n" data-new-link>
+                <span class="ms" aria-hidden="true">person_add</span>New customer <kbd>N</kbd>
+            </a>
+        }
+        @if (canSupplier && newRole != "customer")
+        {
+            <a class="btn" href="/Parties/Edit?role=supplier" data-key="N" data-new-link>
+                <span class="ms" aria-hidden="true">add_business</span>New supplier <kbd>Shift N</kbd>
+            </a>
+        }
+    </div>
+</header>
+
+<nav class="segments" aria-label="Show">
+    <a href="/Parties@(Model.Q is null ? "" : "?q=" + Uri.EscapeDataString(Model.Q))" aria-current="@(Model.RoleType is null ? "page" : null)">All</a>
+    <a href="/Parties?role=customer@(Model.Q is null ? "" : "&q=" + Uri.EscapeDataString(Model.Q))" aria-current="@(Model.RoleType == 1 ? "page" : null)">Customers</a>
+    <a href="/Parties?role=supplier@(Model.Q is null ? "" : "&q=" + Uri.EscapeDataString(Model.Q))" aria-current="@(Model.RoleType == 2 ? "page" : null)">Suppliers</a>
+</nav>
+
+<form method="get" class="search-row" data-live-search="/Parties?handler=Rows" role="search">
+    @if (Model.Role is not null) { <input type="hidden" name="role" value="@Model.Role" /> }
+    <label class="search-field">
+        <span class="ms" aria-hidden="true">search</span>
+        <input type="search" name="q" value="@Model.Q" placeholder="Search @Model.Title.ToLowerInvariant()" autocomplete="off" spellcheck="false" autofocus aria-label="Search" />
+        <kbd>↓</kbd>
+    </label>
+</form>
+
+<div data-live-results>
+    <partial name="_PartyRows" model="Model" />
+</div>
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+}

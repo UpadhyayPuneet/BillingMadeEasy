@@ -1,0 +1,434 @@
+@page "{id:long}"
+@model BillingMadeEasy.Web.Pages.Parties.ViewModel
+@using System.Text.Json
+@using System.Globalization
+@using BillingMadeEasy.Core.Parties
+@{
+    var d = Model.Detail;
+    var p = d.Party;
+    ViewData["Title"] = p.DisplayName;
+    var inr = CultureInfo.GetCultureInfo("en-IN");
+    string Money(decimal? v) => v is null ? "—" : "₹" + v.Value.ToString("#,##,##0.##", inr);
+    string Json(object o) => JsonSerializer.Serialize(o);
+    var stateOptions = Model.States;
+}
+<header class="page-head">
+    <div>
+        <a class="back" href="/Parties"><span class="ms" aria-hidden="true">arrow_back</span>Parties</a>
+        <h1>@p.DisplayName</h1>
+        <p class="muted">
+            @if (!string.Equals(p.LegalName, p.DisplayName, StringComparison.OrdinalIgnoreCase)) { <span>@p.LegalName · </span> }
+            @if (p.TradingName is not null) { <span>Trading as @p.TradingName · </span> }
+            <span>@PartyCodes.PartyType(p.PartyType)</span>
+            @if (p.CategoryName is not null) { <span> · @p.CategoryName</span> }
+        </p>
+        <p class="chips-inline">
+            @if (d.Customer is not null) { <span class="badge">Customer</span> }
+            @if (d.Supplier is not null) { <span class="badge">Supplier</span> }
+            @if (p.Status != PartyCodes.StatusActive) { <span class="badge warn">@PartyCodes.Status(p.Status)</span> }
+            @if (!p.IsActive) { <span class="badge warn">Archived</span> }
+            @if (p.TaxIdNumber is not null) { <span class="badge mono" title="PAN">PAN @p.TaxIdNumber</span> }
+            @if (p.PartyCode is not null) { <span class="badge mono" title="Code">@p.PartyCode</span> }
+        </p>
+    </div>
+    @if (Model.CanEditParty)
+    {
+        <div class="actions">
+            <a class="btn" href="/Parties/Edit/@p.PartyId" data-key="e"><span class="ms" aria-hidden="true">edit</span>Edit <kbd>E</kbd></a>
+            <details class="menu">
+                <summary class="btn" aria-label="More actions"><span class="ms" aria-hidden="true">more_horiz</span></summary>
+                <form method="post" asp-page-handler="Status" class="menu-list">
+                    @if (p.Status != PartyCodes.StatusActive) { <button name="status" value="1">Make active</button> }
+                    @if (p.Status != PartyCodes.StatusOnHold) { <button name="status" value="2">Put on hold</button> }
+                    @if (p.Status != PartyCodes.StatusClosed) { <button name="status" value="3">Close account</button> }
+                    @if (p.IsActive) { <button name="isActive" value="false">Archive</button> }
+                    else { <button name="isActive" value="true">Restore</button> }
+                </form>
+            </details>
+        </div>
+    }
+</header>
+
+@if (Model.Flash is not null)
+{
+    <div class="notice" role="status">@Model.Flash</div>
+}
+@if (Model.Duplicates.Count > 0)
+{
+    <div class="notice warn" role="alert">
+        <strong>This may already exist.</strong>
+        @foreach (var dup in Model.Duplicates)
+        {
+            <a href="/Parties/View/@dup.PartyId">@dup.DisplayName</a><span class="muted"> (@dup.MatchOn)</span>
+        }
+        <span class="muted">If it's the same business, archive one so invoices stay on a single record.</span>
+    </div>
+}
+
+<section class="summary-grid">
+    @if (d.Customer is { } c)
+    {
+        <article class="card stat">
+            <h2>As a customer</h2>
+            <dl class="facts">
+                <dt>Credit days</dt><dd>@(c.PaymentTermDays is null or 0 ? "Due on receipt" : c.PaymentTermDays + " days")</dd>
+                <dt>Credit limit</dt><dd>@(c.CreditLimit is null ? "No limit" : Money(c.CreditLimit))</dd>
+                <dt>Opening balance</dt><dd>@Money(c.OpeningBalance)</dd>
+                @if (c.IsBlocked) { <dt>Blocked</dt><dd>@(c.BlockReason ?? "Yes")</dd> }
+            </dl>
+        </article>
+    }
+    @if (d.Supplier is { } s)
+    {
+        <article class="card stat">
+            <h2>As a supplier</h2>
+            <dl class="facts">
+                <dt>Payment days</dt><dd>@(s.PaymentTermDays is null or 0 ? "Due on receipt" : s.PaymentTermDays + " days")</dd>
+                <dt>Opening balance</dt><dd>@Money(s.OpeningBalance)</dd>
+                @if (s.IsBlocked) { <dt>Blocked</dt><dd>@(s.BlockReason ?? "Yes")</dd> }
+            </dl>
+        </article>
+    }
+    <article class="card stat">
+        <h2>Reach</h2>
+        <dl class="facts">
+            <dt>Phone</dt><dd>@if (p.Phone is not null) { <a href="tel:@p.Phone">@p.Phone</a> } else { <span>—</span> }</dd>
+            <dt>Email</dt><dd>@if (p.Email is not null) { <a href="mailto:@p.Email">@p.Email</a> } else { <span>—</span> }</dd>
+            @if (p.Website is not null) { <dt>Website</dt><dd>@p.Website</dd> }
+        </dl>
+    </article>
+</section>
+@if (p.Notes is not null)
+{
+    <p class="card note">@p.Notes</p>
+}
+
+@* ── Branches ── *@
+<section class="card section">
+    <header class="card-head">
+        <h2>Branches <span class="count">@d.Locations.Count</span></h2>
+        @if (Model.CanLocations) { <button type="button" class="btn small" data-dialog="location" data-key="b"><span class="ms" aria-hidden="true">add</span>Branch <kbd>B</kbd></button> }
+    </header>
+    <p class="muted small">Each branch has its own GSTIN. The one you bill decides CGST + SGST or IGST on the invoice.</p>
+    @if (d.Locations.Count == 0)
+    {
+        <p class="empty-inline">No branches yet. Add one with its GSTIN before invoicing.</p>
+    }
+    else
+    {
+        <ul class="item-list">
+            @foreach (var l in d.Locations)
+            {
+                var addr = l.AddressId is null ? null : d.Addresses.FirstOrDefault(a => a.PartyAddressId == l.AddressId);
+                <li>
+                    <div class="item-main">
+                        <strong>@l.LocationName</strong>
+                        @if (l.IsDefault) { <span class="badge success">Default</span> }
+                        <span class="sub">@(l.Gstin is null ? "Unregistered" : l.Gstin) @(l.StateName is null ? "" : " · " + l.StateName)</span>
+                        @if (addr is not null) { <span class="sub">@addr.OneLine</span> }
+                    </div>
+                    @if (Model.CanLocations)
+                    {
+                        <div class="item-actions">
+                            <button type="button" class="icon-btn" aria-label="Edit @l.LocationName" data-dialog="location" data-item="@Json(new {
+                                l.PartyLocationId, l.LocationName, l.LocationCode, l.Gstin, l.Phone, l.Email, l.IsDefault,
+                                AddressLine1 = addr?.Line1, AddressLine2 = addr?.Line2, City = addr?.City, StateCode = addr?.StateCode ?? l.StateCode, PostalCode = addr?.PostalCode })"><span class="ms" aria-hidden="true">edit</span></button>
+                            <form method="post" asp-page-handler="Delete" data-confirm="Remove the branch @l.LocationName?">
+                                <input type="hidden" name="kind" value="location" /><input type="hidden" name="itemId" value="@l.PartyLocationId" />
+                                <button type="submit" class="icon-btn" aria-label="Remove @l.LocationName"><span class="ms" aria-hidden="true">delete</span></button>
+                            </form>
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@* ── Contacts ── *@
+<section class="card section">
+    <header class="card-head">
+        <h2>Contacts <span class="count">@d.Contacts.Count</span></h2>
+        @if (Model.CanContacts) { <button type="button" class="btn small" data-dialog="contact" data-key="c"><span class="ms" aria-hidden="true">add</span>Contact <kbd>C</kbd></button> }
+    </header>
+    @if (d.Contacts.Count == 0)
+    {
+        <p class="empty-inline">No contacts yet.</p>
+    }
+    else
+    {
+        <ul class="item-list">
+            @foreach (var ct in d.Contacts)
+            {
+                <li>
+                    <div class="item-main">
+                        <strong>@ct.ContactName</strong>
+                        @if (ct.IsPrimary) { <span class="badge success">Primary</span> }
+                        <span class="sub">@string.Join(" · ", new[] { ct.Designation, ct.Department, ct.LocationName }.Where(x => !string.IsNullOrEmpty(x)))</span>
+                        <span class="sub">
+                            @if (ct.Mobile is not null) { <a href="tel:@ct.Mobile">@ct.Mobile</a> }
+                            @if (ct.Phone is not null) { <a href="tel:@ct.Phone">@ct.Phone</a> }
+                            @if (ct.Email is not null) { <a href="mailto:@ct.Email">@ct.Email</a> }
+                        </span>
+                    </div>
+                    @if (Model.CanContacts)
+                    {
+                        <div class="item-actions">
+                            <button type="button" class="icon-btn" aria-label="Edit @ct.ContactName" data-dialog="contact" data-item="@Json(new {
+                                ct.PartyContactId, ct.PartyLocationId, ct.ContactName, ct.Designation, ct.Department, ct.Phone, ct.Mobile, ct.Email, ct.Notes, ct.IsPrimary })"><span class="ms" aria-hidden="true">edit</span></button>
+                            <form method="post" asp-page-handler="Delete" data-confirm="Remove @ct.ContactName?">
+                                <input type="hidden" name="kind" value="contact" /><input type="hidden" name="itemId" value="@ct.PartyContactId" />
+                                <button type="submit" class="icon-btn" aria-label="Remove @ct.ContactName"><span class="ms" aria-hidden="true">delete</span></button>
+                            </form>
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@* ── Addresses ── *@
+<section class="card section">
+    <header class="card-head">
+        <h2>Addresses <span class="count">@d.Addresses.Count</span></h2>
+        @if (Model.CanLocations) { <button type="button" class="btn small" data-dialog="address" data-key="a"><span class="ms" aria-hidden="true">add</span>Address <kbd>A</kbd></button> }
+    </header>
+    @if (d.Addresses.Count == 0)
+    {
+        <p class="empty-inline">No addresses yet.</p>
+    }
+    else
+    {
+        <ul class="item-list">
+            @foreach (var a in d.Addresses)
+            {
+                <li>
+                    <div class="item-main">
+                        <strong>@(a.AddressLabel ?? PartyCodes.AddressType(a.AddressType))</strong>
+                        <span class="badge">@PartyCodes.AddressType(a.AddressType)</span>
+                        @if (a.IsDefault) { <span class="badge success">Default</span> }
+                        <span class="sub">@a.OneLine</span>
+                        @if (a.UsedByLocations > 0) { <span class="sub">Used by @a.UsedByLocations branch@(a.UsedByLocations == 1 ? "" : "es")</span> }
+                    </div>
+                    @if (Model.CanLocations)
+                    {
+                        <div class="item-actions">
+                            <button type="button" class="icon-btn" aria-label="Edit address" data-dialog="address" data-item="@Json(new {
+                                a.PartyAddressId, a.AddressType, a.AddressLabel, a.Line1, a.Line2, a.City, a.StateCode, a.PostalCode, a.IsDefault })"><span class="ms" aria-hidden="true">edit</span></button>
+                            @if (a.UsedByLocations == 0)
+                            {
+                                <form method="post" asp-page-handler="Delete" data-confirm="Remove this address?">
+                                    <input type="hidden" name="kind" value="address" /><input type="hidden" name="itemId" value="@a.PartyAddressId" />
+                                    <button type="submit" class="icon-btn" aria-label="Remove address"><span class="ms" aria-hidden="true">delete</span></button>
+                                </form>
+                            }
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@* ── Brands ── *@
+@if (d.Brands.Count > 0 || Model.CanBrands)
+{
+    <section class="card section">
+        <header class="card-head">
+            <h2>Brands <span class="count">@d.Brands.Count</span></h2>
+            @if (Model.CanBrands) { <button type="button" class="btn small" data-dialog="brand"><span class="ms" aria-hidden="true">add</span>Brand</button> }
+        </header>
+        <p class="muted small">Brands this customer runs, for agencies that bill per brand.</p>
+        @if (d.Brands.Count > 0)
+        {
+            <ul class="item-list">
+                @foreach (var b in d.Brands)
+                {
+                    <li>
+                        <div class="item-main">
+                            <strong>@b.BrandName</strong>
+                            @if (b.BrandCode is not null) { <span class="badge mono">@b.BrandCode</span> }
+                            @if (b.Description is not null) { <span class="sub">@b.Description</span> }
+                        </div>
+                        @if (Model.CanBrands)
+                        {
+                            <div class="item-actions">
+                                <button type="button" class="icon-btn" aria-label="Edit @b.BrandName" data-dialog="brand" data-item="@Json(new { b.PartyBrandId, b.BrandName, b.BrandCode, b.Description })"><span class="ms" aria-hidden="true">edit</span></button>
+                                <form method="post" asp-page-handler="Delete" data-confirm="Remove the brand @b.BrandName?">
+                                    <input type="hidden" name="kind" value="brand" /><input type="hidden" name="itemId" value="@b.PartyBrandId" />
+                                    <button type="submit" class="icon-btn" aria-label="Remove @b.BrandName"><span class="ms" aria-hidden="true">delete</span></button>
+                                </form>
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+}
+
+@* ── Dialogs ── *@
+<dialog id="dlg-location" class="dialog" aria-labelledby="dlg-location-title" data-open="@(Model.OpenDialog == "location" ? "true" : null)">
+    <form method="post" asp-page-handler="Location" class="dialog-form" novalidate autocomplete="off">
+        <h2 id="dlg-location-title" data-new-title="New branch" data-edit-title="Edit branch">New branch</h2>
+        <div asp-validation-summary="ModelOnly" class="notice danger"></div>
+        <input type="hidden" asp-for="Location.PartyLocationId" />
+        <div class="fields two">
+            <label class="field">
+                <span>GSTIN</span>
+                <input asp-for="Location.Gstin" class="mono upper" maxlength="15" spellcheck="false" data-gstin data-gstin-state="#Location_StateCode" />
+                <span class="field-help" data-gstin-result aria-live="polite"></span>
+                <span asp-validation-for="Location.Gstin" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>Branch name <span class="req" aria-hidden="true">*</span></span>
+                <input asp-for="Location.LocationName" placeholder="Jaipur, Head office…" />
+                <span asp-validation-for="Location.LocationName" class="field-error"></span>
+            </label>
+            <label class="field span-2">
+                <span>Address</span>
+                <input asp-for="Location.AddressLine1" placeholder="Building, street" />
+            </label>
+            <label class="field span-2">
+                <input asp-for="Location.AddressLine2" placeholder="Area, landmark" aria-label="Address line 2" />
+            </label>
+            <label class="field">
+                <span>City</span>
+                <input asp-for="Location.City" />
+            </label>
+            <label class="field">
+                <span>PIN code</span>
+                <input asp-for="Location.PostalCode" inputmode="numeric" maxlength="6" />
+            </label>
+            <label class="field">
+                <span>State</span>
+                <select asp-for="Location.StateCode">
+                    <option value="">Select</option>
+                    @foreach (var s in stateOptions) { <option value="@s.StateCode">@s.StateName (@s.StateCode)</option> }
+                </select>
+                <span asp-validation-for="Location.StateCode" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>Branch code</span>
+                <input asp-for="Location.LocationCode" class="mono" />
+            </label>
+            <label class="field">
+                <span>Phone</span>
+                <input asp-for="Location.Phone" type="tel" />
+            </label>
+            <label class="field">
+                <span>Email</span>
+                <input asp-for="Location.Email" type="email" />
+                <span asp-validation-for="Location.Email" class="field-error"></span>
+            </label>
+            <label class="check span-2"><input asp-for="Location.IsDefault" /> <span>Default branch for billing</span></label>
+        </div>
+        <footer class="dialog-actions">
+            <button type="button" class="btn" data-close>Cancel <kbd>Esc</kbd></button>
+            <button type="submit" class="btn primary">Save <kbd>Ctrl Enter</kbd></button>
+        </footer>
+    </form>
+</dialog>
+
+<dialog id="dlg-contact" class="dialog" aria-labelledby="dlg-contact-title" data-open="@(Model.OpenDialog == "contact" ? "true" : null)">
+    <form method="post" asp-page-handler="Contact" class="dialog-form" novalidate autocomplete="off">
+        <h2 id="dlg-contact-title" data-new-title="New contact" data-edit-title="Edit contact">New contact</h2>
+        <div asp-validation-summary="ModelOnly" class="notice danger"></div>
+        <input type="hidden" asp-for="Contact.PartyContactId" />
+        <div class="fields two">
+            <label class="field span-2">
+                <span>Name <span class="req" aria-hidden="true">*</span></span>
+                <input asp-for="Contact.ContactName" />
+                <span asp-validation-for="Contact.ContactName" class="field-error"></span>
+            </label>
+            <label class="field"><span>Designation</span><input asp-for="Contact.Designation" /></label>
+            <label class="field"><span>Department</span><input asp-for="Contact.Department" /></label>
+            <label class="field"><span>Mobile</span><input asp-for="Contact.Mobile" type="tel" inputmode="tel" /></label>
+            <label class="field"><span>Phone</span><input asp-for="Contact.Phone" type="tel" inputmode="tel" /></label>
+            <label class="field span-2">
+                <span>Email</span>
+                <input asp-for="Contact.Email" type="email" />
+                <span asp-validation-for="Contact.Email" class="field-error"></span>
+            </label>
+            <label class="field span-2">
+                <span>Branch</span>
+                <select asp-for="Contact.PartyLocationId">
+                    <option value="">Whole business</option>
+                    @foreach (var l in d.Locations) { <option value="@l.PartyLocationId">@l.LocationName</option> }
+                </select>
+            </label>
+            <label class="field span-2"><span>Notes</span><input asp-for="Contact.Notes" /></label>
+            <label class="check span-2"><input asp-for="Contact.IsPrimary" /> <span>Primary contact (invoices are addressed to them)</span></label>
+        </div>
+        <footer class="dialog-actions">
+            <button type="button" class="btn" data-close>Cancel <kbd>Esc</kbd></button>
+            <button type="submit" class="btn primary">Save <kbd>Ctrl Enter</kbd></button>
+        </footer>
+    </form>
+</dialog>
+
+<dialog id="dlg-address" class="dialog" aria-labelledby="dlg-address-title" data-open="@(Model.OpenDialog == "address" ? "true" : null)">
+    <form method="post" asp-page-handler="Address" class="dialog-form" novalidate autocomplete="off">
+        <h2 id="dlg-address-title" data-new-title="New address" data-edit-title="Edit address">New address</h2>
+        <div asp-validation-summary="ModelOnly" class="notice danger"></div>
+        <input type="hidden" asp-for="Address.PartyAddressId" />
+        <div class="fields two">
+            <label class="field">
+                <span>Type</span>
+                <select asp-for="Address.AddressType">
+                    @foreach (var t in PartyCodes.AddressTypes) { <option value="@t.Code">@t.Label</option> }
+                </select>
+            </label>
+            <label class="field"><span>Label</span><input asp-for="Address.AddressLabel" placeholder="Warehouse, Site 2…" /></label>
+            <label class="field span-2">
+                <span>Address <span class="req" aria-hidden="true">*</span></span>
+                <input asp-for="Address.Line1" placeholder="Building, street" />
+                <span asp-validation-for="Address.Line1" class="field-error"></span>
+            </label>
+            <label class="field span-2"><input asp-for="Address.Line2" placeholder="Area, landmark" aria-label="Address line 2" /></label>
+            <label class="field"><span>City</span><input asp-for="Address.City" /></label>
+            <label class="field"><span>PIN code</span><input asp-for="Address.PostalCode" inputmode="numeric" maxlength="6" /></label>
+            <label class="field span-2">
+                <span>State</span>
+                <select asp-for="Address.StateCode">
+                    <option value="">Select</option>
+                    @foreach (var s in stateOptions) { <option value="@s.StateCode">@s.StateName (@s.StateCode)</option> }
+                </select>
+                <span asp-validation-for="Address.StateCode" class="field-error"></span>
+            </label>
+            <label class="check span-2"><input asp-for="Address.IsDefault" /> <span>Default for this type</span></label>
+        </div>
+        <footer class="dialog-actions">
+            <button type="button" class="btn" data-close>Cancel <kbd>Esc</kbd></button>
+            <button type="submit" class="btn primary">Save <kbd>Ctrl Enter</kbd></button>
+        </footer>
+    </form>
+</dialog>
+
+<dialog id="dlg-brand" class="dialog" aria-labelledby="dlg-brand-title" data-open="@(Model.OpenDialog == "brand" ? "true" : null)">
+    <form method="post" asp-page-handler="Brand" class="dialog-form" novalidate autocomplete="off">
+        <h2 id="dlg-brand-title" data-new-title="New brand" data-edit-title="Edit brand">New brand</h2>
+        <div asp-validation-summary="ModelOnly" class="notice danger"></div>
+        <input type="hidden" asp-for="Brand.PartyBrandId" />
+        <div class="fields two">
+            <label class="field">
+                <span>Brand name <span class="req" aria-hidden="true">*</span></span>
+                <input asp-for="Brand.BrandName" />
+                <span asp-validation-for="Brand.BrandName" class="field-error"></span>
+            </label>
+            <label class="field"><span>Code</span><input asp-for="Brand.BrandCode" class="mono" /></label>
+            <label class="field span-2"><span>Description</span><input asp-for="Brand.Description" /></label>
+        </div>
+        <footer class="dialog-actions">
+            <button type="button" class="btn" data-close>Cancel <kbd>Esc</kbd></button>
+            <button type="submit" class="btn primary">Save <kbd>Ctrl Enter</kbd></button>
+        </footer>
+    </form>
+</dialog>
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+    <script src="~/js/form.js" asp-append-version="true"></script>
+    <script src="~/js/dialogs.js" asp-append-version="true"></script>
+}

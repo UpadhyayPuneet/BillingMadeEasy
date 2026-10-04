@@ -81,6 +81,18 @@ public sealed partial class SqlDatabaseFixture : IAsyncLifetime
         return ((long)row.TenantId, (long)row.UserId);
     }
 
+    /// <summary>Adds an existing person to a business with one of its roles (by code: OWNER, VIEWER…).</summary>
+    public async Task AddMemberAsync(long tenantId, long userId, string roleCode)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        await connection.ExecuteAsync("""
+            INSERT INTO tbl_TenantUsers (TenantId, UserId, IsTenantOwner, IsDefaultTenant, Status, AcceptedAtUtc, IsActive)
+            VALUES (@tenantId, @userId, 0, 0, 2, SYSUTCDATETIME(), 1);
+            INSERT INTO tbl_TenantUserRoles (TenantUserId, RoleId, AssignedAtUtc)
+            SELECT SCOPE_IDENTITY(), RoleId, SYSUTCDATETIME() FROM tbl_Roles WHERE TenantId = @tenantId AND RoleCode = @roleCode;
+            """, new { tenantId, userId, roleCode });
+    }
+
     public async Task<T> ScalarAsync<T>(string sql, object? parameters = null)
     {
         await using var connection = new SqlConnection(ConnectionString);

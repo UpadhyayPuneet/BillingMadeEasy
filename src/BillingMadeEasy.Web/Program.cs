@@ -34,12 +34,16 @@ else
         throw new InvalidOperationException("No connection string 'BillingMadeEasy'. Set one, or use Auth:Provider=Demo in Development.");
     services.AddSingleton<IAuthService, SqlAuthService>();
     services.AddSingleton<IEntitlementStore, SqlEntitlementStore>();
+
+    // Modules that read and write business data exist only when a database does.
+    services.AddSingleton<IAppModule, PartiesModule>();
 }
 
 services.AddMemoryCache();
 services.AddSingleton(TimeProvider.System);
 services.AddSingleton<EntitlementService>();
 services.AddScoped<NavigationService>();
+services.AddScoped<BillingMadeEasy.Web.Features.Parties.PartyStore>();
 
 // ── Authentication: cookie, HttpOnly, SameSite=Lax, sliding ──
 services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -68,6 +72,7 @@ services.AddSingleton<IAuthorizationPolicyProvider, PolicyProvider>();
 services.AddSingleton<IAuthorizationHandler, TenantSelectedHandler>();
 services.AddSingleton<IAuthorizationHandler, ModuleHandler>();
 services.AddSingleton<IAuthorizationHandler, PermissionHandler>();
+services.AddSingleton<IAuthorizationHandler, AnyPermissionHandler>();
 services.AddSingleton<IAuthorizationMiddlewareResultHandler, FriendlyAuthorizationResultHandler>();
 services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().AddRequirements(new TenantSelectedRequirement()).Build())
@@ -99,8 +104,12 @@ services.AddRazorPages(options =>
 // A module's page folder is gated by its entitlement: no per-page attribute to forget.
 services.AddOptions<RazorPagesOptions>().Configure<IEnumerable<IAppModule>>((options, modules) =>
 {
-    foreach (var module in modules.Where(m => m.PagesFolder is not null))
-        options.Conventions.AuthorizeFolder(module.PagesFolder!, Policies.Module(module.Key));
+    foreach (var module in modules)
+    {
+        if (module.PagesFolder is not null && ModuleCatalog.Find(module.Key) is not { IsCore: true })
+            options.Conventions.AuthorizeFolder(module.PagesFolder, Policies.Module(module.Key));
+        module.ConfigurePages(options.Conventions);
+    }
 });
 
 services.AddProblemDetails();

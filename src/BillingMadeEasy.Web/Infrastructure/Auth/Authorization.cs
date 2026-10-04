@@ -17,9 +17,13 @@ public static class Policies
     public const string PlatformAdmin = "platform-admin";
     public const string ModulePrefix = "module:";
     public const string PermissionPrefix = "perm:";
+    public const string AnyPermissionPrefix = "anyperm:";
 
     public static string Module(string key) => ModulePrefix + key;
     public static string Permission(string code) => PermissionPrefix + code;
+
+    /// <summary>Passes when the user holds at least one of the codes.</summary>
+    public static string AnyPermission(params string[] codes) => AnyPermissionPrefix + string.Join('|', codes);
 }
 
 public sealed class TenantSelectedRequirement : IAuthorizationRequirement;
@@ -27,6 +31,8 @@ public sealed class TenantSelectedRequirement : IAuthorizationRequirement;
 public sealed record ModuleRequirement(string ModuleKey) : IAuthorizationRequirement;
 
 public sealed record PermissionRequirement(string Code) : IAuthorizationRequirement;
+
+public sealed record AnyPermissionRequirement(IReadOnlyList<string> Codes) : IAuthorizationRequirement;
 
 public sealed class PolicyProvider(IOptions<AuthorizationOptions> options) : DefaultAuthorizationPolicyProvider(options)
 {
@@ -37,6 +43,10 @@ public sealed class PolicyProvider(IOptions<AuthorizationOptions> options) : Def
 
         if (policyName.StartsWith(Policies.PermissionPrefix, StringComparison.Ordinal))
             return Tenant().AddRequirements(new PermissionRequirement(policyName[Policies.PermissionPrefix.Length..])).Build();
+
+        if (policyName.StartsWith(Policies.AnyPermissionPrefix, StringComparison.Ordinal))
+            return Tenant().AddRequirements(new AnyPermissionRequirement(
+                policyName[Policies.AnyPermissionPrefix.Length..].Split('|', StringSplitOptions.RemoveEmptyEntries))).Build();
 
         return await base.GetPolicyAsync(policyName);
     }
@@ -68,6 +78,15 @@ public sealed class PermissionHandler : AuthorizationHandler<PermissionRequireme
     protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, PermissionRequirement requirement)
     {
         if (context.User.HasPermission(requirement.Code)) context.Succeed(requirement);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class AnyPermissionHandler : AuthorizationHandler<AnyPermissionRequirement>
+{
+    protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, AnyPermissionRequirement requirement)
+    {
+        if (requirement.Codes.Any(context.User.HasPermission)) context.Succeed(requirement);
         return Task.CompletedTask;
     }
 }

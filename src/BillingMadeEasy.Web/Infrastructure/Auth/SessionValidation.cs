@@ -12,6 +12,10 @@ namespace BillingMadeEasy.Web.Infrastructure.Auth;
 public static class SessionValidation
 {
     private const string LockedKey = "bme:locked";
+    private const string IdleMinutesKey = "bme:idle";
+
+    /// <summary>Minutes of inactivity before the session locks, for the page's own idle timer. 0 = never.</summary>
+    public static int IdleLockMinutes(HttpContext http) => http.Items.TryGetValue(IdleMinutesKey, out var v) && v is int m ? m : 0;
 
     public static async Task ValidateAsync(CookieValidatePrincipalContext context)
     {
@@ -35,6 +39,7 @@ public static class SessionValidation
         }
 
         if (state.Status == SessionStatus.Locked) context.HttpContext.Items[LockedKey] = true;
+        context.HttpContext.Items[IdleMinutesKey] = state.IdleLockMinutes;
     }
 
     /// <summary>Sends a locked session to the unlock screen; APIs get 423 so the page can prompt in place.</summary>
