@@ -1,0 +1,76 @@
+@page
+@model BillingMadeEasy.Web.Pages.Team.InviteModel
+@{
+    ViewData["Title"] = "Invite someone";
+}
+<header class="page-head">
+    <div>
+        <a class="back" href="/Team"><span class="ms" aria-hidden="true">arrow_back</span>Team <kbd>Esc</kbd></a>
+        <h1>Invite someone</h1>
+        <p class="muted">They get an email with a link to set their password. The link works once, for 24 hours.</p>
+    </div>
+</header>
+
+<form method="post" class="sheet-form" data-form novalidate autocomplete="off">
+    <div asp-validation-summary="ModelOnly" class="notice danger" role="alert"></div>
+
+    <section class="form-card">
+        <h2>Who</h2>
+        <div class="fields two">
+            <label class="field">
+                <span>Name <span class="req" aria-hidden="true">*</span></span>
+                <input asp-for="Form.FullName" autofocus />
+                <span asp-validation-for="Form.FullName" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>Email <span class="req" aria-hidden="true">*</span></span>
+                <input asp-for="Form.Email" type="email" inputmode="email" />
+                <span asp-validation-for="Form.Email" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>Mobile</span>
+                <input asp-for="Form.Mobile" type="tel" inputmode="numeric" maxlength="14" placeholder="98765 43210" />
+                <span asp-validation-for="Form.Mobile" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>Designation</span>
+                <input asp-for="Form.Designation" placeholder="Accounts executive" />
+            </label>
+            <label class="field">
+                <span>Employee code</span>
+                <input asp-for="Form.EmployeeCode" class="mono" />
+            </label>
+        </div>
+    </section>
+
+    <section class="form-card">
+        <h2>What they can do</h2>
+        <span asp-validation-for="Form.RoleIds" class="field-error block"></span>
+        <div class="choice-list">
+            @foreach (var r in Model.Roles)
+            {
+                bool locked = r.IsOwnerRole && !Model.ActorIsOwner;
+                <label class="choice-row @(locked ? "readonly" : null)" title="@(locked ? "Only an owner can make someone an owner" : null)">
+                    <input type="checkbox" name="Form.RoleIds" value="@r.RoleId" checked="@Model.Form.RoleIds.Contains(r.RoleId)" disabled="@locked" />
+                    <span class="choice-text">
+                        <strong>@r.RoleName</strong>
+                        <span class="sub">@(r.Description ?? $"{r.PermissionCount} permissions") · @r.MemberCount @(r.MemberCount == 1 ? "person" : "people")</span>
+                    </span>
+                </label>
+            }
+        </div>
+        @if (Model.Can("Admin.Role.View"))
+        {
+            <p class="small muted">See exactly what each role allows on <a href="/Team/Roles">Roles &amp; permissions</a>.</p>
+        }
+    </section>
+
+    <footer class="action-bar">
+        <a class="btn" href="/Team" data-cancel>Cancel <kbd>Esc</kbd></a>
+        <button type="submit" class="btn primary">Send invitation <kbd>Ctrl Enter</kbd></button>
+    </footer>
+</form>
+
+@section Scripts {
+    <script src="~/js/form.js" asp-append-version="true"></script>
+}

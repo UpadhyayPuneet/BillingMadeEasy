@@ -7,6 +7,10 @@
 <h1>Sign in</h1>
 <p class="muted">Welcome back.</p>
 
+@if (Model.JustWelcomed)
+{
+    <div class="notice" role="status">Your password is set. Sign in to start.</div>
+}
 @if (Model.Error is not null)
 {
     <div class="notice danger" role="alert">@Model.Error</div>
@@ -16,12 +20,12 @@
     <input type="hidden" asp-for="ReturnUrl" />
     <label class="field">
         <span>Email or mobile</span>
-        <input asp-for="Identifier" autocomplete="username" autofocus inputmode="email" />
+        <input asp-for="Identifier" autocomplete="username" autofocus="@string.IsNullOrEmpty(Model.Identifier)" inputmode="email" />
         <span asp-validation-for="Identifier" class="field-error"></span>
     </label>
     <label class="field">
         <span>Password</span>
-        <input asp-for="Password" autocomplete="current-password" />
+        <input asp-for="Password" autocomplete="current-password" autofocus="@(!string.IsNullOrEmpty(Model.Identifier))" />
         <span asp-validation-for="Password" class="field-error"></span>
     </label>
     <label class="check">

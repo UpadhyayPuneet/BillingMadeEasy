@@ -1,0 +1,41 @@
+@page
+@model BillingMadeEasy.Web.Pages.Account.WelcomeModel
+@{
+    ViewData["Title"] = "Welcome";
+    Layout = "_AuthLayout";
+}
+@if (Model.Problem is not null)
+{
+    <h1>That link didn't work</h1>
+    <p class="muted">@Model.Problem</p>
+    <a class="btn primary block" href="/Account/SignIn@(Model.Email is null ? "" : "?email=" + Uri.EscapeDataString(Model.Email))">Go to sign in</a>
+}
+else
+{
+    <h1>Welcome, @(Model.FullName?.Split(' ')[0])</h1>
+    <p class="muted">
+        @if (Model.Context is { } c)
+        {
+            <span>@(c.InviterName ?? "Someone") added you to <strong>@c.TenantName</strong>@(c.RoleNames is null ? "" : " as " + c.RoleNames).</span>
+        }
+        Choose a password to finish setting up.
+    </p>
+
+    <form method="post" class="form" novalidate>
+        <input type="hidden" name="u" value="@Model.PublicId" />
+        <input type="hidden" name="t" value="@Model.Token" />
+        <input type="email" value="@Model.Email" autocomplete="username" hidden readonly />
+        <label class="field">
+            <span>Password</span>
+            <input asp-for="Password" autocomplete="new-password" autofocus minlength="@Model.MinLength" />
+            <span class="field-help">At least @Model.MinLength characters.</span>
+            <span asp-validation-for="Password" class="field-error"></span>
+        </label>
+        <label class="field">
+            <span>Type it again</span>
+            <input asp-for="Confirm" autocomplete="new-password" />
+            <span asp-validation-for="Confirm" class="field-error"></span>
+        </label>
+        <button type="submit" class="btn primary block">Set password <kbd>Enter</kbd></button>
+    </form>
+}

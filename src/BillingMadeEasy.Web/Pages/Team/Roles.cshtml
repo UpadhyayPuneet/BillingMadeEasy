@@ -1,0 +1,52 @@
+@page
+@model BillingMadeEasy.Web.Pages.Team.RolesModel
+@{
+    ViewData["Title"] = "Roles & permissions";
+}
+<header class="page-head">
+    <div>
+        <a class="back" href="/Team"><span class="ms" aria-hidden="true">arrow_back</span>Team</a>
+        <h1>Roles &amp; permissions</h1>
+        <p class="muted">A role is a set of things people may do. Give someone several roles and they get everything those roles allow.</p>
+    </div>
+    @if (Model.Can("Admin.Role.Manage"))
+    {
+        <a class="btn primary" href="/Team/Role" data-key="n"><span class="ms" aria-hidden="true">add</span>New role <kbd>N</kbd></a>
+    }
+</header>
+
+@if (Model.Flash is not null)
+{
+    <div class="notice" role="status">@Model.Flash</div>
+}
+
+<div class="table-wrap">
+    <table class="grid-table" data-row-nav>
+        <thead>
+            <tr>
+                <th scope="col">Role</th>
+                <th scope="col" class="num">Permissions</th>
+                <th scope="col" class="num">People</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in Model.Roles)
+            {
+                <tr data-href="/Team/Role/@r.RoleId" tabindex="0">
+                    <td>
+                        <a class="row-link" href="/Team/Role/@r.RoleId" tabindex="-1">@r.RoleName</a>
+                        @if (r.IsOwnerRole) { <span class="badge success">Full access</span> }
+                        else if (r.IsSystemRole) { <span class="badge">Built-in</span> }
+                        @if (r.Description is not null) { <span class="sub">@r.Description</span> }
+                    </td>
+                    <td class="num">@r.PermissionCount</td>
+                    <td class="num">@r.MemberCount</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+}

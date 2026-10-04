@@ -1,0 +1,102 @@
+@page "{id:long?}"
+@model BillingMadeEasy.Web.Pages.Team.RoleModel
+@{
+    string title = Model.IsNew ? "New role" : Model.Role!.RoleName;
+    ViewData["Title"] = title;
+    var chosen = Model.Form.PermissionIds.ToHashSet();
+}
+<header class="page-head">
+    <div>
+        <a class="back" href="/Team/Roles"><span class="ms" aria-hidden="true">arrow_back</span>Roles <kbd>Esc</kbd></a>
+        <h1>@title</h1>
+        @if (Model.Role is { IsEditable: false })
+        {
+            <p class="muted">The Owner role always has every permission, so a business can never lock itself out.</p>
+        }
+        else if (Model.Role is not null)
+        {
+            <p class="muted">@Model.Role.MemberCount @(Model.Role.MemberCount == 1 ? "person has" : "people have") this role.</p>
+        }
+    </div>
+    @if (!Model.IsNew && !Model.ReadOnly && Model.Role is { IsSystemRole: false })
+    {
+        <form method="post" asp-page-handler="Delete" data-confirm="Delete the role @title?">
+            <button type="submit" class="btn"><span class="ms" aria-hidden="true">delete</span>Delete</button>
+        </form>
+    }
+</header>
+
+@if (Model.Flash is not null)
+{
+    <div class="notice" role="status">@Model.Flash</div>
+}
+
+<form method="post" class="sheet-form wide" data-form novalidate autocomplete="off">
+    <div asp-validation-summary="ModelOnly" class="notice danger" role="alert"></div>
+    <fieldset disabled="@Model.ReadOnly" class="plain">
+        <section class="form-card">
+            <div class="fields two">
+                <label class="field">
+                    <span>Name <span class="req" aria-hidden="true">*</span></span>
+                    <input asp-for="Form.RoleName" autofocus />
+                    <span asp-validation-for="Form.RoleName" class="field-error"></span>
+                </label>
+                <label class="field">
+                    <span>Description</span>
+                    <input asp-for="Form.Description" placeholder="Who this is for" />
+                </label>
+            </div>
+        </section>
+
+        <section class="form-card">
+            <header class="card-head">
+                <h2>Permissions <span class="count" data-perm-count>@chosen.Count</span></h2>
+                <label class="search-field compact">
+                    <span class="ms" aria-hidden="true">filter_list</span>
+                    <input type="search" placeholder="Filter, e.g. invoice" data-perm-filter aria-label="Filter permissions" />
+                </label>
+            </header>
+            <p class="small muted">You can only add permissions you have yourself; those are locked <span class="ms tiny" aria-hidden="true">lock</span>. Removing is always allowed.</p>
+
+            @foreach (var module in Model.Groups.GroupBy(g => g.Module))
+            {
+                <div class="perm-module" data-perm-module>
+                    <h3>@module.Key</h3>
+                    @foreach (var group in module)
+                    {
+                        <fieldset class="perm-group" data-perm-group>
+                            <legend>
+                                <label class="check"><input type="checkbox" data-perm-all aria-label="All of @group.Group" /> <span>@group.Group</span></label>
+                            </legend>
+                            @foreach (var p in group.Items)
+                            {
+                                bool has = chosen.Contains(p.PermissionId);
+                                bool locked = !has && !Model.Grantable.Contains(p.PermissionId);
+                                <label class="perm @(locked ? "locked" : null)" data-perm data-search="@($"{p.DisplayName} {p.PermissionCode} {group.Group} {module.Key} {p.Description}".ToLowerInvariant())"
+                                       title="@(locked ? "You don't have this permission, so you can't give it" : p.Description)">
+                                    <input type="checkbox" name="Form.PermissionIds" value="@p.PermissionId" checked="@has" disabled="@locked" />
+                                    <span>@p.DisplayName</span>
+                                    @if (locked) { <span class="ms tiny" aria-hidden="true">lock</span> }
+                                </label>
+                            }
+                        </fieldset>
+                    }
+                </div>
+            }
+        </section>
+    </fieldset>
+
+    @if (!Model.ReadOnly)
+    {
+        <footer class="action-bar">
+            <a class="btn" href="/Team/Roles" data-cancel>Cancel <kbd>Esc</kbd></a>
+            <button type="submit" class="btn primary">@(Model.IsNew ? "Create role" : "Save") <kbd>Ctrl Enter</kbd></button>
+        </footer>
+    }
+</form>
+
+@section Scripts {
+    <script src="~/js/form.js" asp-append-version="true"></script>
+    <script src="~/js/dialogs.js" asp-append-version="true"></script>
+    <script src="~/js/permissions.js" asp-append-version="true"></script>
+}

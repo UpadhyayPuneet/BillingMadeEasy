@@ -66,6 +66,32 @@
         }
     });
 
+    // Buttons that need a confirmation of their own (several actions share one form).
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-confirm-click]');
+        if (b && !confirm(b.getAttribute('data-confirm-click'))) { e.preventDefault(); e.stopPropagation(); }
+    }, true);
+
+    // Copy to clipboard with feedback.
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-copy]');
+        if (!b) return;
+        var text = b.getAttribute('data-copy');
+        var done = function () {
+            var label = b.lastChild; var old = label.textContent;
+            label.textContent = 'Copied';
+            setTimeout(function () { label.textContent = old; }, 1600);
+        };
+        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done);
+        else {
+            var field = b.parentElement.querySelector('input[readonly]');
+            if (field) { field.select(); document.execCommand('copy'); done(); }
+        }
+    });
+    document.querySelectorAll('[data-select-all]').forEach(function (el) {
+        el.addEventListener('focus', function () { el.select(); });
+    });
+
     // Confirm before destructive posts.
     document.addEventListener('submit', function (e) {
         var message = e.target.getAttribute && e.target.getAttribute('data-confirm');

@@ -37,6 +37,7 @@ else
 
     // Modules that read and write business data exist only when a database does.
     services.AddSingleton<IAppModule, PartiesModule>();
+    services.AddSingleton<IAppModule, TeamModule>();
 }
 
 services.AddMemoryCache();
@@ -44,6 +45,12 @@ services.AddSingleton(TimeProvider.System);
 services.AddSingleton<EntitlementService>();
 services.AddScoped<NavigationService>();
 services.AddScoped<BillingMadeEasy.Web.Features.Parties.PartyStore>();
+services.AddScoped<BillingMadeEasy.Web.Features.Team.TeamStore>();
+services.AddScoped<BillingMadeEasy.Web.Features.Team.InviteSender>();
+services.AddScoped<AccountTokens>();
+services.AddScoped<BillingMadeEasy.Web.Infrastructure.Settings.SettingsReader>();
+services.AddScoped<BillingMadeEasy.Web.Infrastructure.Email.EmailService>();
+services.AddSingleton(builder.Configuration.GetSection("Email").Get<BillingMadeEasy.Web.Infrastructure.Email.EmailOptions>() ?? new());
 
 // ── Authentication: cookie, HttpOnly, SameSite=Lax, sliding ──
 services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -96,6 +103,7 @@ services.AddRazorPages(options =>
     options.Conventions.AllowAnonymousToPage("/Account/SignIn");
     options.Conventions.AllowAnonymousToPage("/Account/SignOut");
     options.Conventions.AllowAnonymousToPage("/Account/Denied");
+    options.Conventions.AllowAnonymousToPage("/Account/Welcome");
     options.Conventions.AuthorizePage("/Account/ChooseBusiness", Policies.SignedIn);
     options.Conventions.AuthorizePage("/Account/Unlock", Policies.SignedIn);
     options.Conventions.AllowAnonymousToPage("/Error");

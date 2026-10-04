@@ -1,0 +1,158 @@
+@page "{id:long}"
+@model BillingMadeEasy.Web.Pages.Team.MemberModel
+@using BillingMadeEasy.Web.Features.Team
+@using BillingMadeEasy.Web.Infrastructure.Email
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{
+    var m = Model.Detail.Member;
+    ViewData["Title"] = m.FullName;
+    bool pending = !m.HasPassword && m.Status == MemberStatus.Active;
+}
+<header class="page-head">
+    <div>
+        <a class="back" href="/Team"><span class="ms" aria-hidden="true">arrow_back</span>Team</a>
+        <h1>@m.FullName @if (Model.IsSelf) { <span class="muted small">(you)</span> }</h1>
+        <p class="muted">@m.Email@(m.Mobile is null ? "" : " · " + m.Mobile)</p>
+        <p class="chips-inline">
+            @if (m.IsTenantOwner) { <span class="badge success">Owner</span> }
+            @if (pending) { <span class="badge warn">Invite pending</span> }
+            else if (m.Status != MemberStatus.Active) { <span class="badge warn">@MemberStatus.Label(m.Status)</span> }
+            @foreach (var r in Model.Detail.Roles) { <span class="badge">@r.RoleName</span> }
+        </p>
+    </div>
+    @if (!Model.IsSelf && (Model.CanDisable || Model.ActorIsOwner))
+    {
+        <details class="menu">
+            <summary class="btn" aria-label="More actions"><span class="ms" aria-hidden="true">more_horiz</span></summary>
+            <div class="menu-list">
+                @if (Model.CanDisable)
+                {
+                    <form method="post" asp-page-handler="Status">
+                        @if (m.Status != MemberStatus.Active) { <button name="status" value="2">Restore access</button> }
+                        @if (m.Status == MemberStatus.Active) { <button name="status" value="3">Suspend</button> }
+                        @if (m.Status != MemberStatus.Removed) { <button name="status" value="4" data-confirm-click="Remove @m.FullName from the team? Their name stays on everything they did.">Remove from team</button> }
+                    </form>
+                }
+                @if (Model.ActorIsOwner && m.Status == MemberStatus.Active)
+                {
+                    <form method="post" asp-page-handler="Owner">
+                        @if (m.IsTenantOwner) { <button name="isOwner" value="false">Remove as owner</button> }
+                        else { <button name="isOwner" value="true" data-confirm-click="Make @m.FullName an owner? Owners can do everything, including changing who owns the business.">Make an owner</button> }
+                    </form>
+                }
+            </div>
+        </details>
+    }
+</header>
+
+@if (Model.Flash is not null)
+{
+    <div class="notice" role="status">@Model.Flash</div>
+}
+
+@if (Model.Invite is { } inv)
+{
+    @if (inv.Delivery == EmailOutcome.Sent)
+    {
+        <div class="notice" role="status">Invitation emailed to <strong>@inv.Email</strong>. The link works once, for 24 hours.</div>
+    }
+    else if (inv.Link is not null)
+    {
+        <section class="notice warn share" role="alert">
+            <p><strong>@(inv.Delivery == EmailOutcome.Disabled ? "Email isn't set up yet," : "The email couldn't be sent,") so share this link with @inv.Name yourself.</strong>
+               It works once, for 24 hours, and is shown only now.</p>
+            <div class="share-row">
+                <input type="text" readonly value="@inv.Link" class="mono" aria-label="Invite link" data-select-all />
+                <button type="button" class="btn small" data-copy="@inv.Link"><span class="ms" aria-hidden="true">content_copy</span>Copy</button>
+                <a class="btn small" target="_blank" rel="noopener" href="https://wa.me/?text=@Uri.EscapeDataString($"You've been invited to join us on Billing Made Easy. Set your password here (valid 24 hours): {inv.Link}")">
+                    <span class="ms" aria-hidden="true">share</span>WhatsApp
+                </a>
+            </div>
+        </section>
+    }
+    else
+    {
+        <div class="notice danger" role="alert">The invitation was saved but no link could be issued. Try “Resend invitation”.</div>
+    }
+}
+
+<section class="summary-grid">
+    <article class="card stat">
+        <h2>Activity</h2>
+        <dl class="facts">
+            <dt>Last active here</dt><dd>@When.Ago(m.LastAccessedAtUtc, "Never")</dd>
+            <dt>Last sign-in</dt><dd>@When.Ago(m.LastLoginAtUtc, "Never")</dd>
+            <dt>Invited</dt><dd>@When.Full(m.InvitedAtUtc)</dd>
+            @if (m.OtherTenants > 0) { <dt>Other businesses</dt><dd>@m.OtherTenants</dd> }
+        </dl>
+    </article>
+    @if (pending && Model.CanManage)
+    {
+        <article class="card stat">
+            <h2>Waiting for them</h2>
+            <p class="muted small">They haven't set a password yet. A new invitation replaces the old link.</p>
+            <form method="post" asp-page-handler="Resend">
+                <button type="submit" class="btn"><span class="ms" aria-hidden="true">forward_to_inbox</span>Resend invitation</button>
+            </form>
+        </article>
+    }
+</section>
+
+@if (Model.CanManage && !Model.CanEditThis)
+{
+    <p class="notice">Only an owner can change another owner's details or roles.</p>
+}
+@if (Model.CanEditThis && m.Status != MemberStatus.Removed)
+{
+    <form method="post" asp-page-handler="Save" class="sheet-form" data-form novalidate autocomplete="off">
+        <div asp-validation-summary="ModelOnly" class="notice danger" role="alert"></div>
+        <section class="form-card">
+            <h2>Details</h2>
+            @if (m.OtherTenants > 0)
+            {
+                <p class="small muted">Their name and mobile are shared with the @m.OtherTenants other business@(m.OtherTenants == 1 ? "" : "es") they belong to.</p>
+            }
+            <div class="fields two">
+                <label class="field">
+                    <span>Name <span class="req" aria-hidden="true">*</span></span>
+                    <input asp-for="Form.FullName" />
+                    <span asp-validation-for="Form.FullName" class="field-error"></span>
+                </label>
+                <label class="field">
+                    <span>Mobile</span>
+                    <input asp-for="Form.Mobile" type="tel" inputmode="numeric" maxlength="14" />
+                    <span asp-validation-for="Form.Mobile" class="field-error"></span>
+                </label>
+                <label class="field"><span>Designation</span><input asp-for="Form.Designation" /></label>
+                <label class="field"><span>Employee code</span><input asp-for="Form.EmployeeCode" class="mono" /></label>
+            </div>
+        </section>
+        <section class="form-card">
+            <h2>Roles</h2>
+            <span asp-validation-for="Form.RoleIds" class="field-error block"></span>
+            <div class="choice-list">
+                @foreach (var r in Model.Roles)
+                {
+                    bool has = Model.Form.RoleIds.Contains(r.RoleId);
+                    bool locked = r.IsOwnerRole && !Model.ActorIsOwner;
+                    <label class="choice-row @(locked ? "readonly" : null)" title="@(locked ? "Only an owner can change the Owner role" : null)">
+                        <input type="checkbox" name="Form.RoleIds" value="@r.RoleId" checked="@has" disabled="@locked" />
+                        <span class="choice-text">
+                            <strong>@r.RoleName</strong>
+                            <span class="sub">@(r.Description ?? $"{r.PermissionCount} permissions")</span>
+                        </span>
+                    </label>
+                }
+            </div>
+        </section>
+        <footer class="action-bar">
+            <a class="btn" href="/Team" data-cancel>Back <kbd>Esc</kbd></a>
+            <button type="submit" class="btn primary">Save <kbd>Ctrl Enter</kbd></button>
+        </footer>
+    </form>
+}
+
+@section Scripts {
+    <script src="~/js/form.js" asp-append-version="true"></script>
+    <script src="~/js/dialogs.js" asp-append-version="true"></script>
+}

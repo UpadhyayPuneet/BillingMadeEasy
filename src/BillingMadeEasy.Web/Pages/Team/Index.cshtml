@@ -1,0 +1,49 @@
+@page
+@model BillingMadeEasy.Web.Pages.Team.IndexModel
+@{
+    ViewData["Title"] = "Team";
+}
+<header class="page-head">
+    <div>
+        <h1>Team</h1>
+        <p class="muted">Who can sign in to this business, and what they can do.</p>
+    </div>
+    <div class="actions">
+        @if (Model.Can("Admin.Role.View"))
+        {
+            <a class="btn" href="/Team/Roles"><span class="ms" aria-hidden="true">admin_panel_settings</span>Roles</a>
+        }
+        @if (Model.Can("Admin.User.Manage"))
+        {
+            <a class="btn primary" href="/Team/Invite" data-key="i"><span class="ms" aria-hidden="true">person_add</span>Invite <kbd>I</kbd></a>
+        }
+    </div>
+</header>
+
+@if (Model.Flash is not null)
+{
+    <div class="notice" role="status">@Model.Flash</div>
+}
+
+<nav class="segments" aria-label="Show">
+    <a href="/Team" aria-current="@(Model.Show is null ? "page" : null)">Current</a>
+    <a href="/Team?show=suspended" aria-current="@(Model.Show == "suspended" ? "page" : null)">Suspended</a>
+    <a href="/Team?show=removed" aria-current="@(Model.Show == "removed" ? "page" : null)">Removed</a>
+</nav>
+
+<form method="get" class="search-row" data-live-search="/Team?handler=Rows" role="search">
+    @if (Model.Show is not null) { <input type="hidden" name="show" value="@Model.Show" /> }
+    <label class="search-field">
+        <span class="ms" aria-hidden="true">search</span>
+        <input type="search" name="q" value="@Model.Q" placeholder="Search by name, email, mobile or employee code" autocomplete="off" spellcheck="false" autofocus aria-label="Search" />
+        <kbd>↓</kbd>
+    </label>
+</form>
+
+<div data-live-results>
+    <partial name="_MemberRows" model="Model" />
+</div>
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+}

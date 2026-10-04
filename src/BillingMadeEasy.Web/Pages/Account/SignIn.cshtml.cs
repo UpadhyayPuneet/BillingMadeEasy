@@ -25,8 +25,16 @@ public sealed class SignInModel(IAuthService auth, IWebHostEnvironment environme
 
     public bool ShowDemoHint => environment.IsDevelopment();
 
-    public IActionResult OnGet() =>
-        User.Identity?.IsAuthenticated == true ? LocalRedirect(SafeReturnUrl) : Page();
+    /// <summary>Arriving from the welcome page: password just set.</summary>
+    public bool JustWelcomed { get; private set; }
+
+    public IActionResult OnGet(string? email, int? welcome)
+    {
+        if (User.Identity?.IsAuthenticated == true) return LocalRedirect(SafeReturnUrl);
+        if (!string.IsNullOrWhiteSpace(email)) Identifier = email.Trim();
+        JustWelcomed = welcome == 1;
+        return Page();
+    }
 
     public async Task<IActionResult> OnPostAsync(CancellationToken ct)
     {

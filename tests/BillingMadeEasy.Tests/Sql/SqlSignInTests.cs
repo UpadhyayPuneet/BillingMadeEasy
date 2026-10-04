@@ -19,6 +19,7 @@ public sealed class SqlAppFactory(SqlDatabaseFixture db) : WebApplicationFactory
         builder.UseSetting("Auth:Provider", "Sql");
         builder.UseSetting("Auth:SignInRequestsPerMinute", "10000");
         builder.UseSetting("ConnectionStrings:BillingMadeEasy", db.ConnectionString);
+        builder.UseSetting("Email:Mode", "Disabled");   // invite flows fall back to the share link
     }
 }
 

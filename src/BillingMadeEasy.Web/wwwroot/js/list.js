@@ -49,10 +49,10 @@
                 // One match: Enter goes straight to it.
                 e.preventDefault();
                 location.href = rows()[0].getAttribute('data-href');
-            } else if (e.key === 'Escape' && input.value) {
+            } else if (e.key === 'Escape') {
+                // First Esc clears the search; the next leaves the box so single-key shortcuts work.
                 e.preventDefault();
-                input.value = '';
-                run();
+                if (input.value) { input.value = ''; run(); } else { input.blur(); }
             }
         });
     }

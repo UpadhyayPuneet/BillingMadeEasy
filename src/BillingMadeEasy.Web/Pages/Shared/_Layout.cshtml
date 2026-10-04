@@ -51,6 +51,19 @@
             <button type="button" class="icon-btn" data-theme-toggle title="Switch theme" aria-label="Switch theme">
                 <span class="ms" aria-hidden="true">contrast</span>
             </button>
+            @{ var settingsItems = nav.Where(n => n.Group == "Settings").ToList(); }
+            @if (settingsItems.Count > 0)
+            {
+                <details class="menu">
+                    <summary class="icon-btn" title="Settings" aria-label="Settings"><span class="ms" aria-hidden="true">settings</span></summary>
+                    <div class="menu-list">
+                        @foreach (var item in settingsItems)
+                        {
+                            <a href="@item.Href"><span class="ms" aria-hidden="true">@item.Icon</span>@item.Title @if (item.Shortcut is not null) { <kbd>g @item.Shortcut</kbd> }</a>
+                        }
+                    </div>
+                </details>
+            }
             <button type="button" class="icon-btn" data-help title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">
                 <span class="ms" aria-hidden="true">keyboard</span>
             </button>

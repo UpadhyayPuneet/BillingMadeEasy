@@ -36,7 +36,8 @@ database and the same stored procedures, so nothing has to be migrated twice.
 3. ~~Port sign-in.~~ Done: `SqlAuthService` over the `usp_Auth_*` procedures, with the lockout ladder, server sessions re-checked on every request, idle lock and unlock, and silent hash upgrade. Tested against a database built from `database/schema`.
 4. Run `database/scripts/30_module_entitlements.sql` on BME_db once. `SqlEntitlementStore` is wired.
    Still to port from Web Forms: OTP sign-in, PIN unlock and trusted devices, forgot/reset password, invite acceptance, must-change-password.
-5. Port screen by screen: users and roles → settings → parties → catalog → numbering → subscriptions. Each one becomes an `IAppModule` folder.
+5. Port screen by screen. Done: **parties** (list, create/edit with GSTIN assist and duplicate guard, branches, contacts, addresses, brands, status) and **team** (people, invite → email → welcome → password, roles and the permission editor, suspend/remove, ownership). Next: settings → catalog → numbering → subscriptions. Each one becomes an `IAppModule` folder.
+   Note: invite links issued by the Web Forms app won't open in the new one (different token hashing); resend from the new Team page.
 6. Build the invoice (stage 9) on .NET 10 only.
 
 ## Getting the project into GitHub

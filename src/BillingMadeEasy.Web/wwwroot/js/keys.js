@@ -195,6 +195,15 @@
     }
     $$('[data-voice]').forEach(function (b) { b.addEventListener('click', listen); });
 
+    // ── Menus (<details class="menu">) close on outside click and Esc, like native menus ──
+    function closeMenus(except) {
+        $$('details.menu[open]').forEach(function (m) { if (m !== except) m.removeAttribute('open'); });
+    }
+    document.addEventListener('click', function (e) { closeMenus(e.target.closest && e.target.closest('details.menu')); });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && document.querySelector('details.menu[open]')) { closeMenus(null); e.stopImmediatePropagation(); }
+    }, true);
+
     // ── Global keys ──
     function typing(el) {
         if (!el) return false;

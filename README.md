@@ -69,6 +69,30 @@ docs/
 | `Auth:SignInRequestsPerMinute` | 10 | Per-IP throttle on sign-in and unlock |
 | `Database:CommandTimeoutSeconds` | 30 | Interactive calls |
 | `Database:BatchTimeoutSeconds` | 120 | Billing runs |
+| `Email:Mode` | `Disabled` (`Pickup` in Development) | `Smtp` sends; `Pickup` writes `.eml` files to `mail-pickup/`; `Disabled` offers the link to share instead |
+| `Email:Host`, `Port`, `UserName`, `Password`, `UseStartTls` | — | SMTP server (Office 365: `smtp.office365.com`, 587) |
+| `Email:FromAddress`, `FromName` | — | Sender shown on every email |
+| `Email:PublicBaseUrl` | request host | Address used in email links, e.g. `https://app.example.in` |
 
 Keep real connection strings and SMTP passwords out of the repository: use
-`dotnet user-secrets` locally and environment variables on the server.
+`dotnet user-secrets` locally and environment variables on the server, e.g.
+
+```powershell
+cd src/BillingMadeEasy.Web
+dotnet user-secrets set "Email:Mode" "Smtp"
+dotnet user-secrets set "Email:Host" "smtp.office365.com"
+dotnet user-secrets set "Email:UserName" "billing@yourdomain.in"
+dotnet user-secrets set "Email:Password" "…"
+dotnet user-secrets set "Email:FromAddress" "billing@yourdomain.in"
+```
+
+## Database scripts
+
+Run every script in `database/scripts` on BME_db, in number order, once. Each is idempotent,
+so running one again does no harm.
+
+| Script | Adds |
+|---|---|
+| `30_module_entitlements.sql` | Plans, add-ons, trials, limits |
+| `31_session_lock.sql` | Server-side screen lock |
+| `32_party_find_by_gstin.sql` | Duplicate-GSTIN check for new parties |

@@ -1,0 +1,45 @@
+@model BillingMadeEasy.Web.Pages.Team.IndexModel
+@using BillingMadeEasy.Web.Features.Team
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@if (Model.Result.Total == 0)
+{
+    <section class="empty">
+        <span class="ms empty-icon" aria-hidden="true">@(Model.Q is null ? "group" : "search_off")</span>
+        <h2>@(Model.Q is null ? "Nobody here" : $"Nobody matches “{Model.Q}”")</h2>
+    </section>
+}
+else
+{
+    <p class="result-count muted" aria-live="polite">@Model.Result.Total @(Model.Result.Total == 1 ? "person" : "people")</p>
+    <div class="table-wrap">
+        <table class="grid-table" data-row-nav>
+            <thead>
+                <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Roles</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Last active</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var m in Model.Result.Rows)
+                {
+                    <tr data-href="/Team/Member/@m.TenantUserId" tabindex="0">
+                        <td>
+                            <a href="/Team/Member/@m.TenantUserId" class="row-link" tabindex="-1">@m.FullName</a>
+                            @if (m.IsTenantOwner) { <span class="badge success">Owner</span> }
+                            <span class="sub">@m.Email@(m.Designation is null ? "" : " · " + m.Designation)</span>
+                        </td>
+                        <td>@m.RoleNames</td>
+                        <td>
+                            @if (m.Status == MemberStatus.Active && m.IsPending) { <span class="badge warn">Invite pending</span> }
+                            else if (m.Status != MemberStatus.Active) { <span class="badge warn">@MemberStatus.Label(m.Status)</span> }
+                            else { <span class="badge">Active</span> }
+                        </td>
+                        <td>@When.Ago(m.LastAccessedAtUtc ?? m.LastLoginAtUtc, "Never")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
