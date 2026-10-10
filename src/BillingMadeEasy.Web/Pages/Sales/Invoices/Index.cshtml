@@ -1,0 +1,68 @@
+@page
+@model BillingMadeEasy.Web.Pages.Sales.Invoices.IndexModel
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{
+    ViewData["Title"] = "Invoices";
+    var s = Model.Result.Summary;
+}
+<header class="page-head">
+    <div>
+        <h1>Invoices</h1>
+        <p class="muted">Search by number, customer, GSTIN, PO number or anything on a line.</p>
+    </div>
+    @if (Model.CanCreate)
+    {
+        <a class="btn primary" href="/Sales/Invoices/Edit" data-key="n"><span class="ms" aria-hidden="true">post_add</span>New invoice <kbd>N</kbd></a>
+    }
+</header>
+
+@if (Model.Flash is not null) { <div class="notice" role="status">@Model.Flash</div> }
+
+<section class="stat-strip" aria-label="Summary">
+    <a class="stat-tile" href="@Model.Link("unpaid")">
+        <span class="stat-label">To collect</span>
+        <span class="stat-value">@Money.Inr(s.Outstanding)</span>
+        <span class="sub">@(s.OutstandingCount ?? 0) unpaid</span>
+    </a>
+    <a class="stat-tile @((s.OverdueCount ?? 0) > 0 ? "warn" : null)" href="@Model.Link("overdue")">
+        <span class="stat-label">Overdue</span>
+        <span class="stat-value">@Money.Inr(s.Overdue)</span>
+        <span class="sub">@(s.OverdueCount ?? 0) past due date</span>
+    </a>
+    <div class="stat-tile">
+        <span class="stat-label">Invoiced this month</span>
+        <span class="stat-value">@Money.Inr(s.InvoicedThisMonth)</span>
+        <span class="sub">@When.TodayIst().ToString("MMMM yyyy")</span>
+    </div>
+    <a class="stat-tile" href="@Model.Link("draft")">
+        <span class="stat-label">Drafts</span>
+        <span class="stat-value">@(s.Drafts ?? 0)</span>
+        <span class="sub">not yet issued</span>
+    </a>
+</section>
+
+<div class="toolbar">
+    <nav class="segments" aria-label="Show">
+        @foreach (var (key, label) in new[] { ("all", "All"), ("draft", "Drafts"), ("unpaid", "Unpaid"), ("overdue", "Overdue"), ("paid", "Paid"), ("cancelled", "Cancelled") })
+        {
+            <a href="@Model.Link(key)" aria-current="@(Model.CurrentView == key ? "page" : null)">@label</a>
+        }
+    </nav>
+</div>
+
+<form method="get" class="search-row" data-live-search="/Sales/Invoices?handler=Rows" role="search">
+    @if (Model.CurrentView != "all") { <input type="hidden" name="view" value="@Model.CurrentView" /> }
+    <label class="search-field">
+        <span class="ms" aria-hidden="true">search</span>
+        <input type="search" name="q" value="@Model.Q" placeholder="Search invoices" autocomplete="off" spellcheck="false" autofocus aria-label="Search" />
+        <kbd>↓</kbd>
+    </label>
+</form>
+
+<div data-live-results>
+    <partial name="_InvoiceRows" model="Model" />
+</div>
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+}

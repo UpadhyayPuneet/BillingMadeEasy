@@ -101,3 +101,4 @@ so running one again does no harm.
 | `34_catalog_defaults_and_customer_prices.sql` | GST rates (Sep 2025 slabs) and units with UQC for every business, new and existing; customer-specific prices |
 | `35_offering_barcode_check.sql` | A duplicate barcode is refused with the name of the item that has it |
 | `36_business_profiles.sql` | Your business: invoicing profiles (GSTIN, address, logo, signature, terms), bank accounts, numbering per profile with the 16-character rule; fixes number padding wrapping at 10,000 |
+| `37_sales_invoices.sql` | Sales invoices: drafts, issue with a gap-free number and the seller frozen onto the invoice, cancel keeping the number, list with outstanding/overdue, agreed and last-sold prices, plan limit, place-of-supply code 96 for exports |

@@ -296,6 +296,7 @@ CREATE OR ALTER PROCEDURE dbo.usp_SalesInvoice_Issue
     @SalesInvoiceId BIGINT,
     @SellerSnapshot NVARCHAR(MAX),
     @Today          DATE,             -- in India, from the application
+    @MonthlyLimit   INT = NULL,       -- the plan's invoices a month; null is unlimited
     @ActionByUserId BIGINT,
     @IpAddress      VARCHAR(45) = NULL
 AS
@@ -326,6 +327,12 @@ BEGIN
                  WHEN @date > @Today THEN N'An invoice can''t be dated in the future'
                  WHEN @partyId IS NOT NULL AND EXISTS (SELECT 1 FROM dbo.tbl_Parties WHERE PartyId = @partyId AND (Status <> 1 OR IsActive = 0))
                       THEN N'This customer is on hold or closed. Make them active before invoicing'
+                 /* Counted inside the lock, so two people issuing together can't both pass it. */
+                 WHEN @MonthlyLimit IS NOT NULL AND
+                      (SELECT COUNT(*) FROM dbo.tbl_SalesInvoices WITH (UPDLOCK)
+                        WHERE TenantId = @TenantId AND Status IN (2, 3)
+                          AND IssuedAtUtc >= DATEFROMPARTS(YEAR(@Today), MONTH(@Today), 1)) >= @MonthlyLimit
+                      THEN CONCAT(N'Your plan includes ', @MonthlyLimit, N' invoices a month and all are used. Upgrade under Plan & modules to keep invoicing; this draft is saved')
             END;
         IF @problem IS NOT NULL
         BEGIN IF @own = 1 ROLLBACK TRANSACTION; ELSE ROLLBACK TRANSACTION sp_invoice_issue; SELECT ResultCode = 5, ResultMessage = @problem; RETURN; END
@@ -603,4 +610,10 @@ BEGIN
                  WHERE i.TenantId = @TenantId AND i.PartyId = @PartyId AND i.Status = 2 AND l.OfferingId = o.OfferingId) THEN 0 ELSE 1 END,
               o.OfferingName;
 END
+GO
+
+/* Place of supply for exports: GST code 96, "Other countries". */
+IF NOT EXISTS (SELECT 1 FROM dbo.tbl_StateCodes WHERE CountryCode = 'IN' AND StateCode = '96')
+    INSERT INTO dbo.tbl_StateCodes (StateCode, CountryCode, StateName, IsUnionTerritory, IsActive)
+    VALUES ('96', 'IN', N'Other countries (export)', 0, 1);
 GO

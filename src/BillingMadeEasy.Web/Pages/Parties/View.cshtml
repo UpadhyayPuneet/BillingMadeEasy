@@ -34,6 +34,10 @@
     @if (Model.CanEditParty)
     {
         <div class="actions">
+            @if (d.Roles.Any(r => r.RoleType == BillingMadeEasy.Core.Parties.PartyCodes.RoleCustomer) && Model.Can("Sales.Invoice.Create"))
+            {
+                <a class="btn primary" href="/Sales/Invoices/Edit?partyId=@p.PartyId" data-key="i"><span class="ms" aria-hidden="true">post_add</span>Invoice <kbd>I</kbd></a>
+            }
             <a class="btn" href="/Parties/Edit/@p.PartyId" data-key="e"><span class="ms" aria-hidden="true">edit</span>Edit <kbd>E</kbd></a>
             <details class="menu">
                 <summary class="btn" aria-label="More actions"><span class="ms" aria-hidden="true">more_horiz</span></summary>

@@ -1,0 +1,54 @@
+@model BillingMadeEasy.Web.Pages.Sales.Invoices.LineView
+@using System.Globalization
+@{
+    var l = Model.Line;
+    string n = $"Form.Lines[{Model.Index}]";
+    string Num(decimal? d) => d is null ? "" : (d.Value / 1.0000000000000000000000000000m).ToString(CultureInfo.InvariantCulture);
+    long? taxId = l.TaxRateId ?? (l.OfferingId is null && l.Description is null ? Model.DefaultTaxRateId : null);
+}
+<div class="inv-line" data-line>
+    <span class="ln" data-ln aria-hidden="true"></span>
+    <div class="cell item">
+        <input type="hidden" name="@(n).OfferingId" value="@l.OfferingId" data-offering />
+        <input type="hidden" name="@(n).PriceSource" value="@l.PriceSource" data-source />
+        <input type="text" name="@(n).Description" value="@l.Description" maxlength="300" placeholder="Item or description" aria-label="Item"
+               autocomplete="off" spellcheck="false" data-item-lookup />
+        <ul class="lookup-list" role="listbox" hidden data-item-results></ul>
+        <span class="price-hint" data-price-hint aria-live="polite"></span>
+        @Html.ValidationMessage($"{n}.Description", new { @class = "field-error" })
+    </div>
+    <div class="cell hsn">
+        <input type="text" name="@(n).HsnSacCode" value="@l.HsnSacCode" class="mono" inputmode="numeric" maxlength="10" placeholder="HSN/SAC" aria-label="HSN or SAC" data-hsn />
+        @Html.ValidationMessage($"{n}.HsnSacCode", new { @class = "field-error" })
+    </div>
+    <div class="cell qty">
+        <input type="text" name="@(n).Quantity" value="@Num(l.Quantity)" inputmode="decimal" placeholder="Qty" aria-label="Quantity" data-qty />
+        @Html.ValidationMessage($"{n}.Quantity", new { @class = "field-error" })
+    </div>
+    <div class="cell unit">
+        <input type="text" name="@(n).UnitCode" value="@l.UnitCode" list="unit-codes" maxlength="20" placeholder="Unit" aria-label="Unit" data-unit />
+    </div>
+    <div class="cell rate">
+        <input type="text" name="@(n).Rate" value="@Num(l.Rate)" inputmode="decimal" placeholder="Rate" aria-label="Rate" data-amount data-rate />
+        <label class="incl" title="The rate already includes GST">
+            <input type="checkbox" name="@(n).RateIncludesTax" value="true" checked="@l.RateIncludesTax" data-incl /> incl. GST
+        </label>
+        @Html.ValidationMessage($"{n}.Rate", new { @class = "field-error" })
+    </div>
+    <div class="cell disc">
+        <input type="text" name="@(n).DiscountPercent" value="@Num(l.DiscountPercent)" inputmode="decimal" placeholder="Disc %" aria-label="Discount percent" data-disc />
+        @Html.ValidationMessage($"{n}.DiscountPercent", new { @class = "field-error" })
+    </div>
+    <div class="cell tax">
+        <select name="@(n).TaxRateId" aria-label="GST rate" data-tax>
+            <option value="" data-rate="0">GST?</option>
+            @foreach (var t in Model.Rates)
+            {
+                <option value="@t.TaxRateId" data-rate="@t.RatePercent.ToString(CultureInfo.InvariantCulture)" selected="@(t.TaxRateId == taxId)">@t.TaxName</option>
+            }
+        </select>
+        @Html.ValidationMessage($"{n}.TaxRateId", new { @class = "field-error" })
+    </div>
+    <output class="cell amount num" data-line-total></output>
+    <button type="button" class="icon-btn remove" aria-label="Remove line (Alt+Delete)" title="Remove line (Alt+Delete)" data-remove-line><span class="ms" aria-hidden="true">close</span></button>
+</div>

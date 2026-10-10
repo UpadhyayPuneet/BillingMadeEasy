@@ -93,6 +93,13 @@ public sealed partial class SqlDatabaseFixture : IAsyncLifetime
             """, new { tenantId, userId, roleCode });
     }
 
+    /// <summary>The first row of a query or procedure, for checking a result's message as well as its code.</summary>
+    public async Task<dynamic> RowAsync(string sql, object? parameters = null)
+    {
+        await using var connection = new SqlConnection(ConnectionString);
+        return await connection.QueryFirstAsync(sql, parameters);
+    }
+
     public async Task<T> ScalarAsync<T>(string sql, object? parameters = null)
     {
         await using var connection = new SqlConnection(ConnectionString);

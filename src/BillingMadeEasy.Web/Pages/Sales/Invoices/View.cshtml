@@ -1,0 +1,262 @@
+@page "{id:long}"
+@model BillingMadeEasy.Web.Pages.Sales.Invoices.ViewModel
+@using System.Globalization
+@using BillingMadeEasy.Core.Billing
+@using BillingMadeEasy.Core.Tax
+@using BillingMadeEasy.Web.Infrastructure.Files
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{
+    var i = Model.Invoice;
+    var s = Model.Seller;
+    string docTitle = i.DocumentType == DocumentTypes.BillOfSupply ? "Bill of Supply" : "Tax Invoice";
+    ViewData["Title"] = i.InvoiceNumber is null ? $"Draft {docTitle.ToLowerInvariant()} · {i.BuyerName}" : $"{i.InvoiceNumber} · {i.BuyerName}";
+    string Qty(decimal q) => (q / 1.0000000000000000000000000000m).ToString("#,##0.####", CultureInfo.GetCultureInfo("en-IN"));
+    string Pct(decimal p) => (p / 1.0000000000000000000000000000m).ToString("0.##", CultureInfo.InvariantCulture) + "%";
+    string? StateLine(string? code) => code is null ? null : $"{StateCodes.Name(code) ?? code} ({code})";
+    bool inter = i.IsInterState;
+    bool hasDiscount = Model.Lines.Any(l => l.DiscountAmount != 0);
+}
+<div class="doc-chrome no-print">
+    <header class="page-head">
+        <div>
+            <a class="back" href="/Sales/Invoices"><span class="ms" aria-hidden="true">arrow_back</span>Invoices</a>
+            <h1>
+                @(i.InvoiceNumber ?? "Draft")
+                @if (i.IsDraft) { <span class="badge">Draft</span> }
+                else if (i.IsCancelled) { <span class="badge warn">Cancelled</span> }
+                else if (i.Balance <= 0) { <span class="badge success">Paid</span> }
+                else if (i.DueDate is { } due && due.Date < When.TodayIst()) { <span class="badge warn">Overdue</span> }
+                else { <span class="badge">Unpaid</span> }
+            </h1>
+            <p class="muted small">
+                @if (i.IsCancelled) { <text>Cancelled @When.Ago(i.CancelledAtUtc) by @i.CancelledByName: “@i.CancelReason”</text> }
+                else if (i.IsIssued) { <text>Issued @When.Ago(i.IssuedAtUtc) by @i.IssuedByName</text> }
+                else { <text>Not issued yet: no number, not sent. Created by @i.CreatedByName @When.Ago(i.CreatedAtUtc).</text> }
+            </p>
+        </div>
+        <div class="actions">
+            @if (i.IsDraft)
+            {
+                <a class="btn" href="/Sales/Invoices/Edit/@i.SalesInvoiceId" data-key="e"><span class="ms" aria-hidden="true">edit</span>Edit <kbd>E</kbd></a>
+                @if (Model.CanIssue)
+                {
+                    <form method="post" asp-page-handler="Issue">
+                        <button type="submit" class="btn primary" data-confirm-click="Issue this invoice? It gets the next number and can no longer be edited."><span class="ms" aria-hidden="true">task_alt</span>Issue</button>
+                    </form>
+                }
+            }
+            <button type="button" class="btn" data-print data-key="p"><span class="ms" aria-hidden="true">print</span>Print / PDF <kbd>P</kbd></button>
+            @if (Model.CanCreate)
+            {
+                <a class="btn" href="/Sales/Invoices/Edit?copy=@i.SalesInvoiceId" data-key="d" title="A new draft with the same customer and lines, dated today"><span class="ms" aria-hidden="true">content_copy</span>Repeat <kbd>D</kbd></a>
+            }
+            @if (i.IsIssued && Model.CanCancel)
+            {
+                <button type="button" class="btn" data-dialog="cancel"><span class="ms" aria-hidden="true">block</span>Cancel</button>
+            }
+        </div>
+    </header>
+    @if (Model.Flash is not null) { <div class="notice" role="status">@Model.Flash</div> }
+    @if (i.IsIssued || i.IsCancelled)
+    {
+        <label class="copy-pick">Print as
+            <select data-copy-label>
+                <option>Original for recipient</option>
+                <option>Duplicate for transporter</option>
+                <option>Triplicate for supplier</option>
+            </select>
+        </label>
+    }
+</div>
+
+<article class="invoice-doc @(i.IsCancelled ? "cancelled" : null) @(i.IsDraft ? "draft" : null)" data-accent="@s?.AccentColor" aria-label="@docTitle">
+    <header class="doc-head">
+        <div class="doc-seller">
+            @if (s?.LogoPath is not null) { <img class="doc-logo" src="@FileStore.Url(s.LogoPath)" alt="@s.Name" /> }
+            <div>
+                <h2 class="doc-name">@(s?.Name)</h2>
+                @if (s is not null && s.LegalName != s.Name) { <p class="doc-legal">@s.LegalName</p> }
+                @if (s is not null) { foreach (var a in s.Address) { <p>@a</p> } }
+                <p>@string.Join(" · ", new[] { s?.Phone, s?.Email, s?.Website }.Where(x => !string.IsNullOrWhiteSpace(x)))</p>
+                @if (s?.Gstin is not null) { <p><strong>GSTIN</strong> <span class="mono">@s.Gstin</span> · <strong>PAN</strong> <span class="mono">@s.Pan</span></p> }
+                @if (s?.Cin is not null) { <p><strong>CIN</strong> <span class="mono">@s.Cin</span></p> }
+                @if (s?.UdyamNumber is not null) { <p><strong>Udyam</strong> <span class="mono">@s.UdyamNumber</span> (MSME)</p> }
+            </div>
+        </div>
+        <div class="doc-meta">
+            <h1 class="doc-title">@docTitle.ToUpperInvariant()</h1>
+            @if (!i.IsDraft) { <p class="doc-copy" data-copy-text>Original for recipient</p> }
+            <dl>
+                <dt>Invoice no.</dt><dd class="mono">@(i.InvoiceNumber ?? "— draft —")</dd>
+                <dt>Date</dt><dd>@i.InvoiceDate.ToString("dd MMM yyyy")</dd>
+                @if (i.DueDate is { } dd) { <dt>Due</dt><dd>@dd.ToString("dd MMM yyyy")</dd> }
+                @if (i.PoNumber is not null) { <dt>PO no.</dt><dd>@i.PoNumber@(i.PoDate is { } pd ? " · " + pd.ToString("dd MMM yyyy") : "")</dd> }
+                <dt>Place of supply</dt><dd>@(StateLine(i.PlaceOfSupply) ?? "—")</dd>
+                <dt>Reverse charge</dt><dd>@(i.IsReverseCharge ? "Yes" : "No")</dd>
+            </dl>
+        </div>
+    </header>
+
+    <section class="doc-parties">
+        <div>
+            <h3>Bill to</h3>
+            <p class="strong">@i.BuyerName</p>
+            @if (i.BuyerAddress is not null) { <p class="pre">@i.BuyerAddress</p> }
+            @if (StateLine(i.BuyerStateCode) is { } bs) { <p>State: @bs</p> }
+            @if (i.BuyerGstin is not null) { <p><strong>GSTIN</strong> <span class="mono">@i.BuyerGstin</span></p> } else { <p class="muted">Unregistered</p> }
+            @if (i.BuyerPhone is not null) { <p>@i.BuyerPhone</p> }
+        </div>
+        @if (i.ShipToAddress is not null || i.ShipToStateCode is not null)
+        {
+            <div>
+                <h3>Ship to</h3>
+                <p class="strong">@(i.ShipToName ?? i.BuyerName)</p>
+                @if (i.ShipToAddress is not null) { <p class="pre">@i.ShipToAddress</p> }
+                @if (StateLine(i.ShipToStateCode) is { } ss) { <p>State: @ss</p> }
+            </div>
+        }
+    </section>
+
+    <table class="doc-lines">
+        <thead>
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">Description</th>
+                <th scope="col">HSN/SAC</th>
+                <th scope="col" class="num">Qty</th>
+                <th scope="col" class="num">Rate</th>
+                @if (hasDiscount) { <th scope="col" class="num">Discount</th> }
+                <th scope="col" class="num">Taxable value</th>
+                @if (!i.IsComposition) { <th scope="col" class="num">GST</th> }
+                <th scope="col" class="num">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var l in Model.Lines)
+            {
+                <tr>
+                    <td>@l.LineNumber</td>
+                    <td>@l.Description@if (l.IsPureAgent) { <span class="sub">Reimbursement at actuals, as pure agent</span> }</td>
+                    <td class="mono">@l.HsnSacCode</td>
+                    <td class="num">@Qty(l.Quantity) @l.UnitCode</td>
+                    <td class="num">@Money.Amount(l.Rate)@if (l.RateIncludesTax && l.TaxRatePercent > 0) { <span class="sub">incl. GST</span> }</td>
+                    @if (hasDiscount) { <td class="num">@(l.DiscountAmount == 0 ? "" : Money.Amount(l.DiscountAmount))</td> }
+                    <td class="num">@Money.Amount(l.TaxableValue)</td>
+                    @if (!i.IsComposition) { <td class="num">@(l.IsPureAgent ? "—" : Pct(l.TaxRatePercent))</td> }
+                    <td class="num">@Money.Amount(l.LineTotal)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <section class="doc-sums">
+        <div class="doc-words">
+            <p class="label">Amount in words</p>
+            <p class="strong">@BillingMadeEasy.Core.Billing.AmountInWords.Rupees(i.GrandTotal)</p>
+            @if (!i.IsComposition && Model.TaxSummary.Count > 0)
+            {
+                <table class="doc-taxsum">
+                    <thead>
+                        <tr>
+                            <th scope="col">HSN/SAC</th><th scope="col" class="num">Taxable</th>
+                            @if (inter) { <th scope="col" class="num">IGST</th> }
+                            else { <th scope="col" class="num">CGST</th><th scope="col" class="num">SGST</th> }
+                            <th scope="col" class="num">Total tax</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in Model.TaxSummary)
+                        {
+                            <tr>
+                                <td class="mono">@(t.HsnSacCode ?? "—")</td>
+                                <td class="num">@Money.Amount(t.Taxable)</td>
+                                @if (inter) { <td class="num">@Pct(t.RatePercent) · @Money.Amount(t.Igst)</td> }
+                                else { <td class="num">@Pct(t.RatePercent / 2) · @Money.Amount(t.Cgst)</td><td class="num">@Pct(t.RatePercent / 2) · @Money.Amount(t.Sgst)</td> }
+                                <td class="num">@Money.Amount(t.Tax)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+        <dl class="doc-totals">
+            <dt>Taxable value</dt><dd>@Money.Amount(i.TaxableTotal)</dd>
+            @if (!i.IsComposition)
+            {
+                if (inter) { <dt>IGST</dt><dd>@Money.Amount(i.IgstTotal)</dd> }
+                else { <dt>CGST</dt><dd>@Money.Amount(i.CgstTotal)</dd><dt>SGST</dt><dd>@Money.Amount(i.SgstTotal)</dd> }
+            }
+            @if (i.ReimbursementTotal != 0) { <dt>Reimbursements</dt><dd>@Money.Amount(i.ReimbursementTotal)</dd> }
+            @if (i.RoundOff != 0) { <dt>Round off</dt><dd>@(i.RoundOff > 0 ? "+" : "")@Money.Amount(i.RoundOff)</dd> }
+            <dt class="grand">Total</dt><dd class="grand">@Money.Inr(i.GrandTotal)</dd>
+            @if (i.AmountPaid > 0) { <dt>Received</dt><dd>@Money.Amount(i.AmountPaid)</dd><dt class="strong">Balance due</dt><dd class="strong">@Money.Inr(i.Balance)</dd> }
+        </dl>
+    </section>
+
+    @if (i.IsComposition)
+    {
+        <p class="doc-statutory">Composition taxable person, not eligible to collect tax on supplies.</p>
+    }
+    @if (i.IsReverseCharge)
+    {
+        <p class="doc-statutory">Tax on this supply is payable by the recipient under reverse charge.</p>
+    }
+
+    <footer class="doc-foot">
+        <div class="doc-pay">
+            @if (s?.Bank is { } b)
+            {
+                <h3>Pay to</h3>
+                <p>@b.AccountName</p>
+                <p>@b.BankName@(b.BranchName is null ? "" : ", " + b.BranchName)</p>
+                <p>A/c <span class="mono">@b.AccountNumber</span> · IFSC <span class="mono">@b.Ifsc</span></p>
+                @if (b.UpiId is not null) { <p>UPI <span class="mono">@b.UpiId</span></p> }
+            }
+            @if (Model.UpiQr is not null)
+            {
+                <figure class="doc-qr">
+                    <img src="@Model.UpiQr" alt="UPI QR code to pay @Money.Inr(i.Balance)" width="112" height="112" />
+                    <figcaption>Scan with any UPI app to pay @Money.Inr(i.Balance)</figcaption>
+                </figure>
+            }
+        </div>
+        <div class="doc-terms">
+            @if (i.Notes is not null) { <p class="pre">@i.Notes</p> }
+            @if (i.Terms is not null) { <h3>Terms</h3><p class="pre small">@i.Terms</p> }
+        </div>
+        <div class="doc-sign">
+            <p>For <strong>@(s?.LegalName)</strong></p>
+            @if (s?.SignaturePath is not null) { <img src="@FileStore.Url(s.SignaturePath)" alt="Signature" class="doc-signature" /> }
+            else { <span class="sign-space"></span> }
+            <p>@(s?.SignatoryName ?? "")</p>
+            <p class="muted">@(s?.SignatoryTitle ?? "Authorised signatory")</p>
+        </div>
+    </footer>
+    @if (!i.IsDraft) { <p class="doc-generated">This is a computer-generated invoice.</p> }
+</article>
+
+@if (i.IsIssued && Model.CanCancel)
+{
+    <dialog id="dlg-cancel" class="dialog" aria-labelledby="dlg-cancel-title" data-open="@(Model.CancelError is null ? null : "true")">
+        <form method="post" asp-page-handler="Cancel" class="dialog-form" novalidate>
+            <h2 id="dlg-cancel-title">Cancel @i.InvoiceNumber?</h2>
+            <p class="muted">The number stays in the register, marked cancelled, and is never given to another invoice. If the customer already has it, a credit note is usually the better correction.</p>
+            @if (Model.CancelError is not null) { <p class="notice danger">@Model.CancelError</p> }
+            <input type="hidden" name="Cancel.Id" value="@i.SalesInvoiceId" />
+            <label class="field">
+                <span>Reason <span class="req" aria-hidden="true">*</span></span>
+                <input type="text" name="reason" maxlength="200" required placeholder="Wrong customer selected" />
+            </label>
+            <footer class="dialog-actions">
+                <button type="button" class="btn" data-close>Keep it <kbd>Esc</kbd></button>
+                <button type="submit" class="btn danger">Cancel invoice</button>
+            </footer>
+        </form>
+    </dialog>
+}
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+    <script src="~/js/dialogs.js" asp-append-version="true"></script>
+    <script src="~/js/invoice-view.js" asp-append-version="true"></script>
+}

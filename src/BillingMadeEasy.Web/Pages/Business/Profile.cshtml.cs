@@ -162,7 +162,7 @@ public sealed partial class ProfileModel(BusinessStore business, PartyStore part
         string path = await files.SaveAsync(TenantId, "business", file, check.Extension!, ct);
         var result = await business.SetImageAsync(TenantId, Id!.Value, kind, path, UserId, IpAddress, ct);
         if (!result.Succeeded) { files.Delete(path); return NotFound(); }
-        files.Delete(result.OldPath);
+        // The old image is kept: invoices already issued print the logo and signature they were issued with.
         Flash = kind == 1 ? "Logo updated. It prints at the top of every new invoice." : "Signature updated. It prints above the signatory's name.";
         return RedirectToPage(new { id = Id });
     }
@@ -172,7 +172,7 @@ public sealed partial class ProfileModel(BusinessStore business, PartyStore part
         if (!CanEdit || IsNew) return Forbid();
         var result = await business.SetImageAsync(TenantId, Id!.Value, kind, null, UserId, IpAddress, ct);
         if (!result.Succeeded) return NotFound();
-        files.Delete(result.OldPath);
+        // Kept on disk for invoices already issued with it.
         Flash = kind == 1 ? "Logo removed." : "Signature removed.";
         return RedirectToPage(new { id = Id });
     }

@@ -1,0 +1,67 @@
+@model BillingMadeEasy.Web.Pages.Sales.Invoices.IndexModel
+@using BillingMadeEasy.Web.Features.Sales
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{ var r = Model.Result; }
+@if (r.Total == 0)
+{
+    <section class="empty">
+        <span class="ms empty-icon" aria-hidden="true">@(Model.Q is null ? "receipt_long" : "search_off")</span>
+        <h2>@(Model.Q is not null ? $"No invoice matches “{Model.Q}”" : Model.CurrentView switch {
+            "draft" => "No drafts", "unpaid" => "Nothing to collect", "overdue" => "Nothing overdue", "paid" => "No paid invoices yet",
+            "cancelled" => "No cancelled invoices", _ => "No invoices yet" })</h2>
+        @if (Model.CurrentView == "all" && Model.Q is null)
+        {
+            <p class="muted">Pick a customer, add items, and the GST, totals and invoice number take care of themselves.</p>
+            @if (Model.CanCreate) { <a class="btn primary" href="/Sales/Invoices/Edit"><span class="ms" aria-hidden="true">post_add</span>Create your first invoice</a> }
+        }
+    </section>
+}
+else
+{
+    <p class="result-count muted" aria-live="polite">@r.Total.ToString("N0") @(r.Total == 1 ? "invoice" : "invoices")</p>
+    <div class="table-wrap">
+        <table class="grid-table" data-row-nav>
+            <thead>
+                <tr>
+                    <th scope="col">Number</th>
+                    <th scope="col">Customer</th>
+                    <th scope="col">Date</th>
+                    <th scope="col">Due</th>
+                    <th scope="col" class="num">Amount</th>
+                    <th scope="col" class="num">Balance</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var i in r.Rows)
+                {
+                    string href = i.Status == InvoiceStatus.Draft ? $"/Sales/Invoices/Edit/{i.SalesInvoiceId}" : $"/Sales/Invoices/View/{i.SalesInvoiceId}";
+                    <tr data-href="@href" tabindex="0" class="@(i.Status == InvoiceStatus.Cancelled ? "inactive" : null)">
+                        <td>
+                            @if (i.Status == InvoiceStatus.Draft) { <span class="badge">Draft</span> }
+                            else { <a href="@href" class="mono"><strong>@i.InvoiceNumber</strong></a> }
+                            @if (i.Status == InvoiceStatus.Cancelled) { <span class="badge warn">Cancelled</span> }
+                        </td>
+                        <td><strong>@i.BuyerName</strong>@if (i.BuyerGstin is not null) { <span class="sub mono">@i.BuyerGstin</span> }</td>
+                        <td>@i.InvoiceDate.ToString("d MMM yyyy")</td>
+                        <td>
+                            @if (i.IsOverdue) { <span class="badge warn">@i.DaysOverdue @(i.DaysOverdue == 1 ? "day" : "days") overdue</span> }
+                            else if (i.Status == InvoiceStatus.Issued && i.Balance <= 0) { <span class="badge success">Paid</span> }
+                            else if (i.DueDate is { } due) { <span>@due.ToString("d MMM")</span> }
+                            else { <span class="muted">On receipt</span> }
+                        </td>
+                        <td class="num">@Money.Inr(i.GrandTotal)</td>
+                        <td class="num">@(i.Status == InvoiceStatus.Issued ? Money.Inr(i.Balance) : "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @if (r.Pages > 1)
+    {
+        <nav class="pager" aria-label="Pages">
+            @if (r.Page > 1) { <a href="@Model.Link(page: r.Page - 1)" rel="prev" data-key="[">‹ Previous <kbd>[</kbd></a> }
+            <span class="muted">Page @r.Page of @r.Pages</span>
+            @if (r.Page < r.Pages) { <a href="@Model.Link(page: r.Page + 1)" rel="next" data-key="]">Next › <kbd>]</kbd></a> }
+        </nav>
+    }
+}

@@ -13,10 +13,21 @@
     function wireForm() {
         form.addEventListener('input', function () { dirty = true; });
         form.addEventListener('change', function () { dirty = true; });
-        form.addEventListener('submit', function () {
+        form.addEventListener('submit', function (e) {
+            if (e.defaultPrevented) return;
+            // Shorthand typed just before Ctrl+Enter never got its blur: convert it now.
+            form.querySelectorAll('[data-amount]').forEach(function (input) {
+                var v = parseAmount(input.value);
+                if (v !== null && v !== '') input.value = String(v);
+            });
             submitting = true;
-            var button = form.querySelector('button[type="submit"]');
-            if (button) { button.disabled = true; button.setAttribute('aria-busy', 'true'); }
+            // Disabled after the browser has read the form: a disabled submitter would drop its name/value
+            // (Save draft vs Save and issue) from what is posted.
+            var pressed = e.submitter;
+            setTimeout(function () {
+                form.querySelectorAll('button[type="submit"]').forEach(function (b) { b.disabled = true; });
+                if (pressed) pressed.setAttribute('aria-busy', 'true');
+            }, 0);
         });
         window.addEventListener('beforeunload', function (e) {
             if (dirty && !submitting) { e.preventDefault(); e.returnValue = ''; }

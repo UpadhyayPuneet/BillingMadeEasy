@@ -1,0 +1,195 @@
+@page "{id:long?}"
+@model BillingMadeEasy.Web.Pages.Sales.Invoices.EditModel
+@using System.Text.Json
+@using BillingMadeEasy.Web.Features.Sales
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{
+    var f = Model.Form;
+    ViewData["Title"] = Model.IsNew ? "New invoice" : "Draft invoice";
+    long? defaultTax = Model.TaxRates.FirstOrDefault(t => t.IsDefault)?.TaxRateId;
+    var profileData = Model.Profiles.Select(p => new { id = p.BusinessProfileId, state = p.StateCode, composition = p.IsComposition });
+    bool hasParty = f.PartyId is not null;
+    var templateLine = new BillingMadeEasy.Web.Pages.Sales.Invoices.LineView("__i__", new LineForm { Quantity = 1 }, Model.TaxRates, defaultTax);
+}
+<header class="page-head">
+    <div>
+        <a class="back" href="/Sales/Invoices"><span class="ms" aria-hidden="true">arrow_back</span>Invoices</a>
+        <h1>@(Model.IsNew ? "New invoice" : "Draft invoice") <span class="badge" data-doc-kind>@(Model.Profile?.IsComposition == true ? "Bill of supply" : "Tax invoice")</span></h1>
+        @if (Model.SavedAtUtc is { } saved) { <p class="muted small">Saved @When.Ago(saved). The number is given when it's issued.</p> }
+        else { <p class="muted small">The invoice number is given when it's issued, so drafts never leave gaps.</p> }
+    </div>
+    @if (!Model.IsNew)
+    {
+        <form method="post" asp-page-handler="Discard" data-confirm="Discard this draft? It has no number, so nothing is left behind.">
+            <button type="submit" class="btn"><span class="ms" aria-hidden="true">delete</span>Discard draft</button>
+        </form>
+    }
+</header>
+
+@if (Model.Flash is not null) { <div class="notice warn" role="status">@Model.Flash</div> }
+
+<form method="post" class="invoice-form" data-form data-invoice-form novalidate autocomplete="off"
+      data-today="@Model.Today.ToString("yyyy-MM-dd")">
+    <div asp-validation-summary="ModelOnly" class="notice danger" role="alert"></div>
+    @Html.ValidationMessage("Form.Lines", new { @class = "notice danger" })
+
+    <div class="inv-head">
+        <section class="form-card">
+            <h2>Bill to</h2>
+            <div class="fields">
+                <div class="field">
+                    <label for="customer">Customer <span class="req" aria-hidden="true">*</span></label>
+                    <input type="hidden" name="Form.PartyId" value="@f.PartyId" data-party-id />
+                    <input type="text" id="customer" name="Form.BuyerName" value="@(Model.CustomerLabel ?? f.BuyerName)" maxlength="200"
+                           placeholder="Search customers, or type a walk-in name" autofocus="@(f.PartyId is null && Model.IsNew)"
+                           spellcheck="false" aria-autocomplete="list" data-customer-lookup="/Sales/Invoices/Edit?handler=Customers&q=" data-customer-url="/Sales/Invoices/Edit?handler=Customer&partyId=" />
+                    <ul class="lookup-list" role="listbox" hidden data-customer-results></ul>
+                    <span class="field-help" data-customer-help>@(hasParty ? "" : "Not in your list? Just type the name — it's billed as a walk-in customer.")</span>
+                    @Html.ValidationMessage("Form.PartyId", new { @class = "field-error" })
+                </div>
+
+                <label class="field" data-branch-field hidden="@(Model.Locations.Count < 2)">
+                    <span>Branch / GSTIN</span>
+                    <select name="Form.PartyLocationId" data-branch>
+                        @foreach (var l in Model.Locations)
+                        {
+                            <option value="@l.PartyLocationId" data-state="@BillingMadeEasy.Web.Pages.Sales.Invoices.EditModel.StateOf(l)" data-gstin="@l.Gstin" selected="@(l.PartyLocationId == f.PartyLocationId)">@l.LocationName@(l.Gstin is null ? "" : " · " + l.Gstin)</option>
+                        }
+                    </select>
+                </label>
+                <p class="buyer-gstin mono" data-buyer-gstin-show>@(hasParty ? (Model.Locations.FirstOrDefault(l => l.PartyLocationId == f.PartyLocationId) ?? Model.Locations.FirstOrDefault())?.Gstin : null)</p>
+
+                <label class="field" data-walkin-only hidden="@hasParty">
+                    <span>GSTIN <span class="muted small">if the buyer is registered</span></span>
+                    <input asp-for="Form.BuyerGstin" class="mono upper" maxlength="15" spellcheck="false" data-gstin data-gstin-state="#Form_BuyerStateCode" />
+                    <span class="field-help" data-gstin-result aria-live="polite"></span>
+                    @Html.ValidationMessage("Form.BuyerGstin", new { @class = "field-error" })
+                </label>
+                <label class="field">
+                    <span>Billing address</span>
+                    <textarea asp-for="Form.BuyerAddress" rows="2" data-buyer-address></textarea>
+                    @Html.ValidationMessage("Form.BuyerAddress", new { @class = "field-error" })
+                </label>
+                <label class="field">
+                    <span>State</span>
+                    <select asp-for="Form.BuyerStateCode" data-buyer-state>
+                        <option value="">Select</option>
+                        @foreach (var s in Model.States) { <option value="@s.StateCode">@s.StateName</option> }
+                    </select>
+                </label>
+                <label class="check"><input asp-for="Form.ShipElsewhere" data-reveal="#ship-to" /> <span>Deliver to a different address</span></label>
+                <div id="ship-to" class="fields reveal">
+                    <label class="field"><span>Ship to name</span><input asp-for="Form.ShipToName" /></label>
+                    <label class="field"><span>Ship to address</span><textarea asp-for="Form.ShipToAddress" rows="2"></textarea></label>
+                    <label class="field">
+                        <span>Ship to state</span>
+                        <select asp-for="Form.ShipToStateCode" data-ship-state>
+                            <option value="">Select</option>
+                            @foreach (var s in Model.States) { <option value="@s.StateCode">@s.StateName</option> }
+                        </select>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <section class="form-card">
+            <h2>Invoice</h2>
+            <div class="fields two">
+                @if (Model.Profiles.Count > 1)
+                {
+                    <label class="field span-2">
+                        <span>From</span>
+                        <select asp-for="Form.BusinessProfileId" data-profile>
+                            @foreach (var p in Model.Profiles) { <option value="@p.BusinessProfileId">@p.ProfileName@(p.Gstin is null ? "" : " · " + p.Gstin)</option> }
+                        </select>
+                    </label>
+                }
+                else
+                {
+                    <input type="hidden" name="Form.BusinessProfileId" value="@f.BusinessProfileId" data-profile />
+                }
+                <label class="field">
+                    <span>Invoice date</span>
+                    <input asp-for="Form.InvoiceDate" type="date" max="@Model.Today.ToString("yyyy-MM-dd")" data-invoice-date />
+                    @Html.ValidationMessage("Form.InvoiceDate", new { @class = "field-error" })
+                </label>
+                <label class="field">
+                    <span>Due date</span>
+                    <input asp-for="Form.DueDate" type="date" data-due-date />
+                    <span class="due-chips" role="group" aria-label="Due in">
+                        @foreach (var d in new[] { 0, 7, 15, 30, 45 }) { <button type="button" class="chip-btn" data-due-days="@d">@(d == 0 ? "On receipt" : d + " days")</button> }
+                    </span>
+                    @Html.ValidationMessage("Form.DueDate", new { @class = "field-error" })
+                </label>
+                <label class="field span-2">
+                    <span>Place of supply <span class="muted small" data-place-auto>follows the customer's state</span></span>
+                    <select asp-for="Form.PlaceOfSupply" data-place>
+                        <option value="">Same as the customer's state</option>
+                        @foreach (var s in Model.States) { <option value="@s.StateCode">@s.StateName (@s.StateCode)</option> }
+                    </select>
+                    <span class="tax-mode" data-tax-mode aria-live="polite"></span>
+                </label>
+                <label class="field"><span>PO / order number</span><input asp-for="Form.PoNumber" /></label>
+                <label class="field"><span>PO date</span><input asp-for="Form.PoDate" type="date" /></label>
+                <label class="check span-2"><input asp-for="Form.IsReverseCharge" /> <span>Tax payable on reverse charge <span class="muted small">— the buyer pays the GST (e.g. legal or goods-transport services to a business)</span></span></label>
+            </div>
+        </section>
+    </div>
+
+    <section class="form-card lines-card">
+        <header class="card-head">
+            <h2>Items</h2>
+            <p class="muted small keys-hint">Enter moves along a row and adds a line at the end · Alt+Delete removes a line · <kbd>25k</kbd> or <kbd>=1200*3</kbd> work in amounts</p>
+        </header>
+        <div class="inv-lines" data-lines role="group" aria-label="Invoice lines">
+            <div class="inv-line head" aria-hidden="true">
+                <span class="ln">#</span><span>Item</span><span>HSN/SAC</span><span>Qty</span><span>Unit</span><span>Rate</span><span>Disc %</span><span>GST</span><span class="num">Amount</span><span></span>
+            </div>
+            @for (int i = 0; i < f.Lines.Count; i++)
+            {
+                <partial name="_Line" model="new BillingMadeEasy.Web.Pages.Sales.Invoices.LineView(i.ToString(), f.Lines[i], Model.TaxRates, defaultTax)" />
+            }
+        </div>
+        <button type="button" class="btn small add-line" data-add-line><span class="ms" aria-hidden="true">add</span>Add line</button>
+        <template id="line-template">
+            <partial name="_Line" model="templateLine" />
+        </template>
+        <datalist id="unit-codes">
+            @foreach (var u in Model.Units) { <option value="@u.UnitCode">@u.UnitName</option> }
+        </datalist>
+
+        <div class="inv-foot">
+            <div class="fields">
+                <label class="field"><span>Note to the customer</span><textarea asp-for="Form.Notes" rows="2"></textarea></label>
+                <label class="field"><span>Terms and conditions</span><textarea asp-for="Form.Terms" rows="3"></textarea></label>
+            </div>
+            <dl class="inv-totals" data-totals aria-live="polite">
+                <dt>Taxable value</dt><dd data-t="taxable">—</dd>
+                <dt data-intra>CGST</dt><dd data-intra data-t="cgst">—</dd>
+                <dt data-intra>SGST</dt><dd data-intra data-t="sgst">—</dd>
+                <dt data-inter hidden>IGST</dt><dd data-inter data-t="igst" hidden>—</dd>
+                <dt data-reimb hidden>Reimbursements</dt><dd data-reimb data-t="reimb" hidden>—</dd>
+                <dt data-round hidden>Round off</dt><dd data-round data-t="round" hidden>—</dd>
+                <dt class="grand">Total</dt><dd class="grand" data-t="grand">—</dd>
+                <dd class="words" data-t="words"></dd>
+            </dl>
+        </div>
+    </section>
+
+    <footer class="action-bar">
+        <a class="btn" href="/Sales/Invoices" data-cancel>Cancel <kbd>Esc</kbd></a>
+        <button type="submit" class="btn" name="then" value="draft">Save draft <kbd>Ctrl Enter</kbd></button>
+        @if (Model.CanIssue)
+        {
+            <button type="submit" class="btn primary" name="then" value="issue" data-issue>Save and issue <kbd>Ctrl Shift Enter</kbd></button>
+        }
+    </footer>
+</form>
+
+<script type="application/json" id="invoice-data">@Html.Raw(JsonSerializer.Serialize(new { profiles = profileData, roundOff = Model.Profile?.RoundOffTotal ?? true }))</script>
+
+@section Scripts {
+    <script src="~/js/form.js" asp-append-version="true"></script>
+    <script src="~/js/dialogs.js" asp-append-version="true"></script>
+    <script src="~/js/invoice.js" asp-append-version="true"></script>
+}
