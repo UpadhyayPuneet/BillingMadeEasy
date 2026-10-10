@@ -1,0 +1,434 @@
+@page "{id:long?}"
+@model BillingMadeEasy.Web.Pages.Business.ProfileModel
+@using System.Text.Json
+@using BillingMadeEasy.Core.Billing
+@using BillingMadeEasy.Web.Features.Business
+@using BillingMadeEasy.Web.Infrastructure.Files
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{
+    var p = Model.Existing;
+    var f = Model.Form;
+    string title = Model.IsNew ? "Another business name or GSTIN" : f.ProfileName;
+    ViewData["Title"] = title;
+    bool retired = p is { IsActive: false };
+    string Json(object o) => JsonSerializer.Serialize(o);
+}
+<header class="page-head">
+    <div>
+        <a class="back" href="/Business"><span class="ms" aria-hidden="true">arrow_back</span>Your business</a>
+        <h1>@title @if (retired) { <span class="badge warn">Retired</span> } @if (p is { IsDefault: true }) { <span class="badge">Default</span> }</h1>
+        @if (p is not null) { <p class="muted small">Updated @When.Ago(p.UpdatedAtUtc, "at signup")</p> }
+    </div>
+    @if (p is not null && Model.CanEdit && !p.IsDefault)
+    {
+        <form method="post" asp-page-handler="Active">
+            @if (retired) { <button class="btn" name="active" value="true">Restore</button> }
+            else { <button class="btn" name="active" value="false" data-confirm-click="Retire @p.ProfileName? You won't be able to invoice under it; its invoices and numbers are kept.">Retire</button> }
+        </form>
+    }
+</header>
+
+@if (Model.Flash is not null) { <div class="notice" role="status">@Model.Flash</div> }
+
+@if (p is not null)
+{
+    <section class="card section">
+        <header class="card-head"><h2>Logo and signature</h2></header>
+        <div class="logo-grid">
+            @foreach (var (kind, path, label, help) in new[] {
+                ((byte)1, p.LogoPath, "Logo", "Top of every invoice. A wide PNG or SVG on a transparent background prints best."),
+                ((byte)2, p.SignaturePath, "Signature", "Printed above the signatory. Sign on white paper, photograph, crop tight.") })
+            {
+                <figure class="logo-tile">
+                    @if (path is not null) { <img src="@FileStore.Url(path)" alt="@label" /> }
+                    else { <span class="logo-empty"><span class="ms" aria-hidden="true">@(kind == 1 ? "image" : "draw")</span>No @label.ToLowerInvariant() yet</span> }
+                    <figcaption><span>@label</span></figcaption>
+                    <p class="muted small">@help</p>
+                    @if (Model.CanEdit)
+                    {
+                        <form method="post" asp-page-handler="Image" enctype="multipart/form-data" class="logo-upload" data-upload>
+                            <input type="hidden" name="kind" value="@kind" />
+                            <label class="btn small">
+                                <span class="ms" aria-hidden="true">upload</span>@(path is null ? "Upload" : "Replace")
+                                <input type="file" name="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden />
+                            </label>
+                        </form>
+                        @if (path is not null)
+                        {
+                            <form method="post" asp-page-handler="RemoveImage" data-confirm="Remove the @label.ToLowerInvariant()?">
+                                <input type="hidden" name="kind" value="@kind" />
+                                <button type="submit" class="btn small">Remove</button>
+                            </form>
+                        }
+                    }
+                </figure>
+            }
+        </div>
+    </section>
+}
+
+<form method="post" class="sheet-form wide" data-form novalidate autocomplete="off" data-profile-form>
+    <div asp-validation-summary="ModelOnly" class="notice danger" role="alert"></div>
+    <fieldset class="plain" disabled="@(!Model.CanEdit)">
+
+    <section class="form-card">
+        <h2>Registration</h2>
+        <p class="muted small">Type the GSTIN first: the PAN and state fill in. The state decides whether a sale is CGST + SGST or IGST.</p>
+        <div class="fields two">
+            <label class="field">
+                <span>GSTIN <span class="muted small">leave empty if not registered</span></span>
+                <input asp-for="Form.Gstin" class="mono upper" maxlength="15" spellcheck="false" autofocus="@Model.IsNew"
+                       data-gstin data-gstin-pan="#Form_Pan" data-gstin-state="#Form_StateCode" data-preview="gstin" />
+                <span class="field-help" data-gstin-result aria-live="polite"></span>
+                <span asp-validation-for="Form.Gstin" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>State</span>
+                <select asp-for="Form.StateCode" data-preview="state">
+                    <option value="">Select</option>
+                    @foreach (var s in Model.States) { <option value="@s.StateCode">@s.StateName (@s.StateCode)</option> }
+                </select>
+                <span asp-validation-for="Form.StateCode" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>Name customers know <span class="req" aria-hidden="true">*</span></span>
+                <input asp-for="Form.ProfileName" placeholder="Yenetch" data-preview="name" />
+                <span asp-validation-for="Form.ProfileName" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>Legal name <span class="req" aria-hidden="true">*</span> <span class="muted small">as on the GST certificate</span></span>
+                <input asp-for="Form.LegalName" placeholder="Yenetch Technologies LLP" data-preview="legal" />
+                <span asp-validation-for="Form.LegalName" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>PAN</span>
+                <input asp-for="Form.Pan" class="mono upper" maxlength="10" spellcheck="false" />
+                <span asp-validation-for="Form.Pan" class="field-error"></span>
+            </label>
+            <label class="check span-2">
+                <input asp-for="Form.IsComposition" />
+                <span>Composition scheme <span class="muted small">— you pay tax on turnover and can't charge GST. Sales are issued as a “bill of supply”, without tax, marked as the law requires.</span></span>
+            </label>
+            <span asp-validation-for="Form.IsComposition" class="field-error span-2"></span>
+        </div>
+    </section>
+
+    <section class="form-card">
+        <h2>Address and contact</h2>
+        <p class="muted small">Printed under your name. Use the principal place of business on your GST registration.</p>
+        <div class="fields two">
+            <label class="field span-2"><span>Address</span><input asp-for="Form.AddressLine1" placeholder="Building, street" data-preview="line1" /></label>
+            <label class="field span-2"><span class="sr-only">Address line 2</span><input asp-for="Form.AddressLine2" placeholder="Area, landmark" aria-label="Address line 2" data-preview="line2" /></label>
+            <label class="field"><span>City</span><input asp-for="Form.City" data-preview="city" /></label>
+            <label class="field">
+                <span>PIN code</span><input asp-for="Form.PostalCode" inputmode="numeric" maxlength="6" data-preview="pin" />
+                <span asp-validation-for="Form.PostalCode" class="field-error"></span>
+            </label>
+            <label class="field"><span>Phone</span><input asp-for="Form.Phone" inputmode="tel" data-preview="phone" /></label>
+            <label class="field">
+                <span>Email</span><input asp-for="Form.Email" inputmode="email" data-preview="email" />
+                <span asp-validation-for="Form.Email" class="field-error"></span>
+            </label>
+            <label class="field span-2"><span>Website</span><input asp-for="Form.Website" inputmode="url" placeholder="yenetch.com" /></label>
+        </div>
+    </section>
+
+    <section class="form-card">
+        <h2>On your invoices</h2>
+        <div class="invoice-look">
+            <div class="fields">
+                <label class="field">
+                    <span>Accent colour <span class="muted small">headings and lines</span></span>
+                    <span class="color-row">
+                        <input type="color" value="@(f.AccentColor ?? "#1D4ED8")" aria-label="Pick colour" data-color-picker />
+                        <input asp-for="Form.AccentColor" class="mono upper" maxlength="7" placeholder="#1D4ED8" data-color-hex data-preview="accent" />
+                    </span>
+                    <span asp-validation-for="Form.AccentColor" class="field-error"></span>
+                </label>
+                <div class="fields two">
+                    <label class="field"><span>Signatory</span><input asp-for="Form.SignatoryName" placeholder="Name of the person signing" /></label>
+                    <label class="field"><span>Designation</span><input asp-for="Form.SignatoryTitle" placeholder="Partner, Director, Proprietor" /></label>
+                </div>
+                <label class="field">
+                    <span>Payment due after <span class="muted small">days; empty means on receipt</span></span>
+                    <input asp-for="Form.DefaultDueDays" type="number" min="0" max="365" inputmode="numeric" placeholder="15" />
+                    <span asp-validation-for="Form.DefaultDueDays" class="field-error"></span>
+                </label>
+                <label class="check"><input asp-for="Form.RoundOffTotal" /> <span>Round the total to the nearest rupee <span class="muted small">— the difference shows as “Round off”</span></span></label>
+            </div>
+            <figure class="invoice-preview" aria-label="Preview of your invoice heading" data-invoice-preview>
+                <div class="ip-head">
+                    @if (p?.LogoPath is not null) { <img src="@FileStore.Url(p.LogoPath)" alt="" class="ip-logo" /> }
+                    <div>
+                        <strong data-ip="name">@f.ProfileName</strong>
+                        <span data-ip="legal">@(f.LegalName != f.ProfileName ? f.LegalName : "")</span>
+                        <span data-ip="address"></span>
+                        <span data-ip="contact"></span>
+                        <span class="mono" data-ip="gstin">@(f.Gstin is null ? "" : "GSTIN " + f.Gstin)</span>
+                    </div>
+                    <span class="ip-title" data-ip="doc">@(f.IsComposition ? "BILL OF SUPPLY" : "TAX INVOICE")</span>
+                </div>
+                <figcaption class="muted small">How the top of your invoice will look.</figcaption>
+            </figure>
+        </div>
+        <div class="fields">
+            <label class="field">
+                <span>Terms and conditions <span class="muted small">printed at the foot of every invoice</span></span>
+                <textarea asp-for="Form.InvoiceTerms" rows="4" placeholder="1. Payment within 15 days of invoice.&#10;2. Interest at 18% p.a. on overdue amounts.&#10;3. Subject to Mumbai jurisdiction."></textarea>
+            </label>
+            <label class="field">
+                <span>Note to customers <span class="muted small">e.g. thank-you line</span></span>
+                <input asp-for="Form.InvoiceNote" placeholder="Thank you for your business." />
+            </label>
+        </div>
+    </section>
+
+    <section class="form-card">
+        <h2>Other registrations <span class="muted small">printed when filled</span></h2>
+        <div class="fields two">
+            <label class="field">
+                <span>Udyam (MSME) number</span>
+                <input asp-for="Form.UdyamNumber" class="mono upper" placeholder="UDYAM-MH-26-0012345" spellcheck="false" />
+                <span class="field-help">Buyers must pay an MSME within 45 days. Printing it reminds them.</span>
+                <span asp-validation-for="Form.UdyamNumber" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>CIN</span>
+                <input asp-for="Form.Cin" class="mono upper" maxlength="21" spellcheck="false" />
+                <span class="field-help">Companies must print it on invoices.</span>
+                <span asp-validation-for="Form.Cin" class="field-error"></span>
+            </label>
+            <label class="field">
+                <span>LUT number</span>
+                <input asp-for="Form.LutNumber" class="mono" spellcheck="false" />
+                <span class="field-help">For exports without IGST under a Letter of Undertaking.</span>
+            </label>
+        </div>
+        @if (!(p?.IsDefault ?? false))
+        {
+            <label class="check"><input asp-for="Form.IsDefault" /> <span>Make this the default for new invoices</span></label>
+        }
+    </section>
+
+    </fieldset>
+    @if (Model.CanEdit)
+    {
+        <footer class="action-bar">
+            <a class="btn" href="/Business" data-cancel>Cancel <kbd>Esc</kbd></a>
+            <button type="submit" class="btn primary">@(Model.IsNew ? "Add" : "Save") <kbd>Ctrl Enter</kbd></button>
+        </footer>
+    }
+</form>
+
+@if (p is not null)
+{
+    <section class="card section" id="payments">
+        <header class="card-head">
+            <h2>Bank accounts <span class="count">@Model.Accounts.Count</span></h2>
+            @if (Model.CanEdit) { <button type="button" class="btn small" data-dialog="bank" data-key="a"><span class="ms" aria-hidden="true">add</span>Bank account <kbd>A</kbd></button> }
+        </header>
+        <p class="muted small">The default account and its UPI ID print on invoices, so customers pay the right account first time.</p>
+        @if (Model.Accounts.Count == 0)
+        {
+            <p class="empty-inline">No bank account yet. Customers won't know where to pay.</p>
+        }
+        else
+        {
+            <ul class="item-list">
+                @foreach (var a in Model.Accounts)
+                {
+                    <li>
+                        <div class="item-main">
+                            <strong>@a.BankName @if (a.IsDefault && Model.Accounts.Count > 1) { <span class="badge">On invoices</span> }</strong>
+                            <span class="sub">
+                                @a.AccountName · @BankAccountType.Label(a.AccountType)
+                                · <span class="mono">@(Model.CanEdit ? a.AccountNumber : a.Masked)</span>
+                                · <span class="mono">@a.Ifsc</span>@(a.BranchName is null ? "" : ", " + a.BranchName)
+                                @if (a.UpiId is not null) { <text>· UPI <span class="mono">@a.UpiId</span></text> }
+                            </span>
+                        </div>
+                        @if (Model.CanEdit)
+                        {
+                            <div class="row-actions">
+                                <button type="button" class="icon-btn" aria-label="Edit @a.BankName" data-dialog="bank" data-item="@Json(new {
+                                    a.BankAccountId, a.BankName, a.AccountName, a.AccountNumber, a.Ifsc, a.BranchName, a.AccountType, a.UpiId, a.IsDefault })"><span class="ms" aria-hidden="true">edit</span></button>
+                                <form method="post" asp-page-handler="RemoveBank" data-confirm="Remove @a.BankName @a.Masked? Invoices already sent keep showing it.">
+                                    <input type="hidden" name="accountId" value="@a.BankAccountId" />
+                                    <button type="submit" class="icon-btn" aria-label="Remove"><span class="ms" aria-hidden="true">delete</span></button>
+                                </form>
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+
+    <section class="card section" id="numbering">
+        <header class="card-head">
+            <h2>Document numbering <span class="count">@Model.Series.Count</span></h2>
+            @if (Model.CanNumbering) { <button type="button" class="btn small" data-dialog="series" data-key="s"><span class="ms" aria-hidden="true">add</span>Series <kbd>S</kbd></button> }
+        </header>
+        <p class="muted small">GST rules: each invoice number is unique for the financial year, consecutive, and at most 16 characters. Numbers are given when a document is issued, never reused, and cancelled ones stay in the register.</p>
+        <div class="table-wrap">
+            <table class="grid-table">
+                <thead><tr><th scope="col">Series</th><th scope="col">For</th><th scope="col">Next number</th><th scope="col" class="num">Issued @(Model.ThisYear % 100)-@((Model.ThisYear + 1) % 100)</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+                <tbody>
+                    @foreach (var s in Model.Series)
+                    {
+                        <tr>
+                            <td><strong>@s.SeriesName</strong> @if (s.IsDefault) { <span class="badge">Default</span> }
+                                <span class="sub">@(s.ResetYearly ? "Restarts each April" : "Runs on across years")@(s.LastNumber is null ? "" : " · last " + s.LastNumber)</span></td>
+                            <td>@DocumentTypes.Name(s.DocumentType)</td>
+                            <td class="mono">@s.NextNumber</td>
+                            <td class="num">@s.IssuedThisYear</td>
+                            <td class="row-actions">
+                                @if (Model.CanNumbering)
+                                {
+                                    <button type="button" class="icon-btn" aria-label="Edit @s.SeriesName" data-dialog="series" data-item="@Json(new {
+                                        s.SeriesId, s.DocumentType, s.SeriesName, s.Prefix, s.Suffix, s.Separator, s.PadWidth, s.YearFormat,
+                                        s.ResetYearly, s.StartFrom, s.IsDefault, s.IssuedTotal, s.NextSequence })"><span class="ms" aria-hidden="true">edit</span></button>
+                                    @if (!s.IsDefault)
+                                    {
+                                        <form method="post" asp-page-handler="RetireSeries" data-confirm="Retire @s.SeriesName? Its numbers stay in the register.">
+                                            <input type="hidden" name="seriesId" value="@s.SeriesId" />
+                                            <button type="submit" class="icon-btn" aria-label="Retire"><span class="ms" aria-hidden="true">archive</span></button>
+                                        </form>
+                                    }
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <dialog id="dlg-bank" class="dialog" aria-labelledby="dlg-bank-title" data-open="@(Model.OpenDialog == "bank" ? "true" : null)">
+        <form method="post" asp-page-handler="Bank" class="dialog-form" novalidate autocomplete="off">
+            <h2 id="dlg-bank-title" data-new-title="New bank account" data-edit-title="Edit bank account">New bank account</h2>
+            <div asp-validation-summary="ModelOnly" class="notice danger"></div>
+            <input type="hidden" asp-for="Bank.BankAccountId" />
+            <div class="fields two">
+                <label class="field">
+                    <span>IFSC <span class="req" aria-hidden="true">*</span></span>
+                    <input asp-for="Bank.Ifsc" class="mono upper" maxlength="11" spellcheck="false" placeholder="HDFC0001234" data-ifsc />
+                    <span class="field-help" data-ifsc-help>On the cheque leaf or passbook.</span>
+                    <span asp-validation-for="Bank.Ifsc" class="field-error"></span>
+                </label>
+                <label class="field">
+                    <span>Bank <span class="req" aria-hidden="true">*</span></span>
+                    <input asp-for="Bank.BankName" placeholder="HDFC Bank" list="bank-names" />
+                    <span asp-validation-for="Bank.BankName" class="field-error"></span>
+                </label>
+                <label class="field span-2">
+                    <span>Name on the account <span class="req" aria-hidden="true">*</span></span>
+                    <input asp-for="Bank.AccountName" placeholder="@f.LegalName" data-default="@f.LegalName" />
+                    <span asp-validation-for="Bank.AccountName" class="field-error"></span>
+                </label>
+                <label class="field">
+                    <span>Account number <span class="req" aria-hidden="true">*</span></span>
+                    <input asp-for="Bank.AccountNumber" class="mono" inputmode="numeric" spellcheck="false" />
+                    <span asp-validation-for="Bank.AccountNumber" class="field-error"></span>
+                </label>
+                <label class="field">
+                    <span>Type</span>
+                    <select asp-for="Bank.AccountType" data-default="1">
+                        @foreach (var t in new[] { BankAccountType.Current, BankAccountType.Savings, BankAccountType.CashCredit }) { <option value="@t">@BankAccountType.Label(t)</option> }
+                    </select>
+                </label>
+                <label class="field"><span>Branch</span><input asp-for="Bank.BranchName" placeholder="Andheri East" /></label>
+                <label class="field">
+                    <span>UPI ID <span class="muted small">for a pay-by-UPI QR</span></span>
+                    <input asp-for="Bank.UpiId" class="mono" spellcheck="false" placeholder="yenetch@hdfcbank" />
+                    <span asp-validation-for="Bank.UpiId" class="field-error"></span>
+                </label>
+                <label class="check span-2"><input asp-for="Bank.IsDefault" /> <span>Print this account on invoices</span></label>
+            </div>
+            <datalist id="bank-names">
+                @foreach (var b in new[] { "State Bank of India", "HDFC Bank", "ICICI Bank", "Axis Bank", "Kotak Mahindra Bank", "Bank of Baroda", "Punjab National Bank", "Canara Bank", "Union Bank of India", "IndusInd Bank", "Yes Bank", "IDFC FIRST Bank", "Bank of India", "Indian Bank", "Federal Bank", "RBL Bank", "AU Small Finance Bank", "Saraswat Co-operative Bank" }) { <option value="@b"></option> }
+            </datalist>
+            <footer class="dialog-actions">
+                <button type="button" class="btn" data-close>Cancel <kbd>Esc</kbd></button>
+                <button type="submit" class="btn primary">Save <kbd>Ctrl Enter</kbd></button>
+            </footer>
+        </form>
+    </dialog>
+
+    <dialog id="dlg-series" class="dialog" aria-labelledby="dlg-series-title" data-open="@(Model.OpenDialog == "series" ? "true" : null)">
+        <form method="post" asp-page-handler="Series" class="dialog-form" novalidate autocomplete="off" data-series-form data-year="@Model.ThisYear">
+            <h2 id="dlg-series-title" data-new-title="New numbering series" data-edit-title="Edit numbering series">New numbering series</h2>
+            <div asp-validation-summary="ModelOnly" class="notice danger"></div>
+            <input type="hidden" asp-for="SeriesForm.SeriesId" />
+            <input type="hidden" name="SeriesForm.IssuedTotal" value="0" data-issued />
+            <input type="hidden" name="SeriesForm.NextSequence" value="0" data-next-seq />
+            <output class="series-preview" data-series-preview aria-live="polite"></output>
+            <p class="notice warn" data-series-locked hidden>Numbers have already been issued from this series, so its format is fixed. To change it, add a new series — from 1 April is cleanest.</p>
+            <div class="fields two">
+                <label class="field">
+                    <span>For</span>
+                    <select asp-for="SeriesForm.DocumentType" data-series-field data-default="1">
+                        @foreach (var d in DocumentTypes.All) { <option value="@d.Code">@d.Name</option> }
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Name <span class="req" aria-hidden="true">*</span></span>
+                    <input asp-for="SeriesForm.SeriesName" placeholder="Tax invoices" />
+                    <span asp-validation-for="SeriesForm.SeriesName" class="field-error"></span>
+                </label>
+                <label class="field">
+                    <span>Prefix</span>
+                    <input asp-for="SeriesForm.Prefix" class="mono upper" maxlength="15" placeholder="INV" data-series-field data-format />
+                    <span asp-validation-for="SeriesForm.Prefix" class="field-error"></span>
+                </label>
+                <label class="field">
+                    <span>Year</span>
+                    <select asp-for="SeriesForm.YearFormat" data-series-field data-format data-default="2">
+                        <option value="2">@(Model.ThisYear % 100)-@((Model.ThisYear + 1) % 100)</option>
+                        <option value="1">@Model.ThisYear-@((Model.ThisYear + 1) % 100)</option>
+                        <option value="3">@Model.ThisYear</option>
+                        <option value="0">No year</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Between parts</span>
+                    <select asp-for="SeriesForm.Separator" data-series-field data-format data-default="-">
+                        <option value="-">Hyphen  INV-26-27-0001</option>
+                        <option value="/">Slash  INV/26-27/0001</option>
+                        <option value="">Nothing  INV26-270001</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Digits</span>
+                    <input asp-for="SeriesForm.PadWidth" type="number" min="1" max="10" inputmode="numeric" data-series-field data-format data-default="4" />
+                    <span asp-validation-for="SeriesForm.PadWidth" class="field-error"></span>
+                </label>
+                <label class="field">
+                    <span>Suffix</span>
+                    <input asp-for="SeriesForm.Suffix" class="mono upper" maxlength="15" data-series-field data-format />
+                    <span asp-validation-for="SeriesForm.Suffix" class="field-error"></span>
+                </label>
+                <label class="field">
+                    <span>Start from</span>
+                    <input asp-for="SeriesForm.StartFrom" type="number" min="1" inputmode="numeric" data-series-field data-format data-default="1" />
+                    <span class="field-help">Moving from another system? Continue its run here.</span>
+                    <span asp-validation-for="SeriesForm.StartFrom" class="field-error"></span>
+                </label>
+                <label class="check span-2"><input asp-for="SeriesForm.ResetYearly" data-series-field data-format data-default="true" /> <span>Restart at 1 every April</span></label>
+                <label class="check span-2"><input asp-for="SeriesForm.IsDefault" /> <span>Default for this kind of document</span></label>
+            </div>
+            <footer class="dialog-actions">
+                <button type="button" class="btn" data-close>Cancel <kbd>Esc</kbd></button>
+                <button type="submit" class="btn primary">Save <kbd>Ctrl Enter</kbd></button>
+            </footer>
+        </form>
+    </dialog>
+}
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+    <script src="~/js/form.js" asp-append-version="true"></script>
+    <script src="~/js/dialogs.js" asp-append-version="true"></script>
+    <script src="~/js/brand.js" asp-append-version="true"></script>
+    <script src="~/js/business.js" asp-append-version="true"></script>
+}

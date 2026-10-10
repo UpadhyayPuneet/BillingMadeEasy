@@ -17,6 +17,11 @@
             if (!el.name || el.name.indexOf(prefix) !== 0) return;
             var key = el.name.slice(prefix.length);
             var value = item && Object.prototype.hasOwnProperty.call(item, key) ? item[key] : null;
+            // A new item starts from the field's declared default (data-default), not from blank.
+            if (!item && el.hasAttribute('data-default')) {
+                var d = el.getAttribute('data-default');
+                value = el.type === 'checkbox' ? d === 'true' : d;
+            }
             if (el.type === 'checkbox') el.checked = value === true;
             else if (el.type === 'hidden' && el.value === 'false') return;      // checkbox companion
             else el.value = value === null || value === undefined ? (el.type === 'hidden' ? '0' : '') : String(value);

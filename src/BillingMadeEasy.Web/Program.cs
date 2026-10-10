@@ -46,6 +46,7 @@ else
     services.AddSingleton<IAppModule, PartiesModule>();
     services.AddSingleton<IAppModule, TeamModule>();
     services.AddSingleton<IAppModule, CatalogModule>();
+    services.AddSingleton<IAppModule, BusinessModule>();
 }
 
 services.AddMemoryCache();
@@ -55,6 +56,7 @@ services.AddScoped<NavigationService>();
 services.AddScoped<BillingMadeEasy.Web.Features.Parties.PartyStore>();
 services.AddScoped<BillingMadeEasy.Web.Features.Team.TeamStore>();
 services.AddScoped<BillingMadeEasy.Web.Features.Catalog.CatalogStore>();
+services.AddScoped<BillingMadeEasy.Web.Features.Business.BusinessStore>();
 services.AddScoped<BillingMadeEasy.Web.Features.Team.InviteSender>();
 services.AddScoped<AccountTokens>();
 services.AddSingleton(builder.Configuration.GetSection("Storage").Get<BillingMadeEasy.Web.Infrastructure.Files.StorageOptions>() ?? new());

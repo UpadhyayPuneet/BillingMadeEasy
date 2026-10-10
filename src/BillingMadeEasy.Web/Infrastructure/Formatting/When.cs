@@ -8,6 +8,9 @@ public static class When
     private static readonly TimeZoneInfo Ist = FindIst();
     private static readonly CultureInfo India = CultureInfo.GetCultureInfo("en-IN");
 
+    /// <summary>Today's date in India, whatever the server's clock zone.</summary>
+    public static DateTime TodayIst() => TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, Ist).Date;
+
     public static DateTime ToLocal(DateTime utc) => TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), Ist);
 
     public static string Ago(DateTime? utc, string never = "—")

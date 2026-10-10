@@ -471,3 +471,49 @@ fieldset:disabled .type-option { cursor: default; }
 @media (max-width: 480px) {
     .topbar-actions [data-help] { display: none; }
 }
+
+/* ── Your business ── */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.row-actions { display: flex; align-items: center; gap: 2px; justify-content: flex-end; }
+.row-actions form { margin: 0; }
+.sub.bad { color: var(--danger); }
+.strong { font-weight: 700; }
+
+.profile-grid { list-style: none; margin: 0 0 var(--space-4); padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-4); }
+.profile-card {
+    --profile-accent: var(--accent);
+    display: grid; grid-template-columns: auto 1fr; gap: var(--space-3) var(--space-4); padding: var(--space-4);
+    color: var(--text); border-top: 4px solid var(--profile-accent); height: 100%;
+}
+.profile-card:hover { text-decoration: none; border-color: var(--profile-accent); box-shadow: 0 4px 16px rgb(0 0 0 / .06); }
+.profile-mark { width: 64px; height: 64px; border-radius: var(--radius-m); border: 1px solid var(--border); background: #fff; display: grid; place-items: center; overflow: hidden; }
+.profile-mark img { max-width: 56px; max-height: 56px; object-fit: contain; }
+.profile-mark .initial { font-size: 28px; font-weight: 700; color: var(--profile-accent); }
+.profile-body { display: grid; gap: 4px; align-content: start; min-width: 0; }
+.profile-body .badge { justify-self: start; }
+.profile-todo { grid-column: 1 / -1; display: flex; gap: var(--space-2); align-items: flex-start; font-size: 13px; color: var(--warning); padding-top: var(--space-2); border-top: 1px solid var(--border); }
+.profile-todo.done { color: var(--success); }
+
+.invoice-look { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: var(--space-4); margin-bottom: var(--space-4); align-items: start; }
+.invoice-preview { --ip-accent: #1D4ED8; margin: 0; display: grid; gap: var(--space-2); }
+.ip-head {
+    display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-3); align-items: start;
+    padding: var(--space-4); background: #fff; color: #14171c; border: 1px solid var(--border); border-radius: var(--radius-m);
+    border-top: 4px solid var(--ip-accent); font-size: 12px; line-height: 1.45;
+}
+.ip-head > div { display: grid; min-width: 0; }
+.ip-head strong { font-size: 16px; color: var(--ip-accent); }
+.ip-head [hidden] { display: none !important; }
+.ip-logo { width: 56px; height: 56px; object-fit: contain; }
+.ip-title { font-weight: 700; letter-spacing: .08em; font-size: 11px; color: var(--ip-accent); white-space: nowrap; }
+
+.series-preview { display: grid; gap: 4px; padding: var(--space-3); border-radius: var(--radius-m); background: var(--surface-2); margin-bottom: var(--space-3); }
+.series-preview .mono { font-size: 16px; }
+
+@media (max-width: 860px) {
+    .invoice-look { grid-template-columns: 1fr; }
+}
+/* Grid tracks never grow to fit a long <option> (e.g. "Dadra and Nagar Haveli and Daman and Diu"). */
+fieldset.plain, .sheet-form { grid-template-columns: minmax(0, 1fr); }
+.form-card, .field { min-width: 0; }
+.field select, .field input, .field textarea { max-width: 100%; min-width: 0; }

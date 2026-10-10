@@ -1,0 +1,72 @@
+@page
+@model BillingMadeEasy.Web.Pages.Business.IndexModel
+@using BillingMadeEasy.Web.Infrastructure.Files
+@{
+    ViewData["Title"] = "Your business";
+    var active = Model.Profiles.Where(p => p.IsActive).ToList();
+    var retired = Model.Profiles.Where(p => !p.IsActive).ToList();
+}
+<header class="page-head">
+    <div>
+        <h1>Your business</h1>
+        <p class="muted">How you appear on invoices: name, GSTIN, address, logo, bank details and invoice numbering.</p>
+    </div>
+    @if (Model.CanEdit)
+    {
+        <a class="btn" href="/Business/Profile" data-key="n"><span class="ms" aria-hidden="true">add_business</span>Another name or GSTIN <kbd>N</kbd></a>
+    }
+</header>
+
+@if (Model.Flash is not null) { <div class="notice" role="status">@Model.Flash</div> }
+
+<ul class="profile-grid">
+    @foreach (var p in active)
+    {
+        <li>
+            <a class="card profile-card" href="/Business/Profile/@p.BusinessProfileId" data-accent="@p.AccentColor">
+                <span class="profile-mark">
+                    @if (p.LogoPath is not null) { <img src="@FileStore.Url(p.LogoPath)" alt="" /> }
+                    else { <span class="initial">@p.ProfileName[..1]</span> }
+                </span>
+                <span class="profile-body">
+                    <strong>@p.ProfileName @if (p.IsDefault && active.Count > 1) { <span class="badge">Default</span> }</strong>
+                    @if (p.LegalName != p.ProfileName) { <span class="sub">@p.LegalName</span> }
+                    <span class="sub mono">@(p.Gstin ?? "No GSTIN")@(p.StateName is null ? "" : " · " + p.StateName)</span>
+                    @if (p.IsComposition) { <span class="badge warn">Composition scheme</span> }
+                    <span class="sub">Next invoice <span class="mono">@(p.NextInvoiceNumber ?? "— no series")</span></span>
+                </span>
+                @if (!string.IsNullOrEmpty(p.Missing))
+                {
+                    <span class="profile-todo"><span class="ms" aria-hidden="true">checklist</span>Add @p.Missing — invoices look incomplete without @(p.Missing.Contains(',') ? "them" : "it").</span>
+                }
+                else
+                {
+                    <span class="profile-todo done"><span class="ms" aria-hidden="true">verified</span>Ready to invoice</span>
+                }
+            </a>
+        </li>
+    }
+</ul>
+
+@if (active.Count == 1)
+{
+    <p class="muted small">Invoice under more than one name — a second firm, a trading brand, or a branch with its own GSTIN in another state? Add it as another profile; each gets its own logo, bank accounts and invoice numbers.</p>
+}
+
+@if (retired.Count > 0)
+{
+    <section class="card section">
+        <header class="card-head"><h2>Retired <span class="count">@retired.Count</span></h2></header>
+        <ul class="item-list">
+            @foreach (var p in retired)
+            {
+                <li><div class="item-main"><a href="/Business/Profile/@p.BusinessProfileId"><strong>@p.ProfileName</strong></a><span class="sub mono">@p.Gstin</span></div></li>
+            }
+        </ul>
+    </section>
+}
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+    <script src="~/js/business.js" asp-append-version="true"></script>
+}
