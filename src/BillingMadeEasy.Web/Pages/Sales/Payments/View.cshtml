@@ -1,0 +1,164 @@
+@page "{id:long}"
+@model BillingMadeEasy.Web.Pages.Sales.Payments.ViewModel
+@using System.Globalization
+@using BillingMadeEasy.Core.Billing
+@using BillingMadeEasy.Web.Infrastructure.Files
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{
+    var p = Model.Payment;
+    var s = Model.Seller;
+    ViewData["Title"] = $"{p.ReceiptNumber} · {p.PayerName}";
+    var active = Model.Lines.Where(l => l.IsActive).ToList();
+}
+<div class="doc-chrome no-print">
+    <header class="page-head">
+        <div>
+            <a class="back" href="/Sales/Payments"><span class="ms" aria-hidden="true">arrow_back</span>Payments</a>
+            <h1>@p.ReceiptNumber @if (p.IsReversed) { <span class="badge warn">Reversed</span> } else if (p.Unapplied > 0) { <span class="badge">Advance @Money.Inr(p.Unapplied)</span> }</h1>
+            <p class="muted small">
+                @if (p.IsReversed) { <text>Reversed @When.Ago(p.ReversedAtUtc) by @p.ReversedByName: “@p.ReverseReason”</text> }
+                else { <text>Recorded @When.Ago(p.CreatedAtUtc) by @p.CreatedByName</text> }
+            </p>
+        </div>
+        <div class="actions">
+            <button type="button" class="btn" data-print data-key="p"><span class="ms" aria-hidden="true">print</span>Print / PDF <kbd>P</kbd></button>
+            @if (!p.IsReversed && Model.CanReverse)
+            {
+                <button type="button" class="btn" data-dialog="reverse"><span class="ms" aria-hidden="true">undo</span>Reverse</button>
+            }
+        </div>
+    </header>
+    @if (Model.Flash is not null) { <div class="notice" role="status">@Model.Flash</div> }
+
+    @if (Model.Open.Count > 0 && Model.CanApply)
+    {
+        <section class="card section" id="apply">
+            <header class="card-head"><h2>Apply the advance <span class="count">@Money.Inr(p.Unapplied)</span></h2></header>
+            <p class="muted small">@p.PayerName has invoices open. Apply this advance to settle them.</p>
+            <form method="post" asp-page-handler="Apply" data-form>
+                <div class="table-wrap">
+                    <table class="grid-table alloc-table">
+                        <thead><tr><th scope="col">Invoice</th><th scope="col">Date</th><th scope="col" class="num">Balance</th><th scope="col" class="num">TDS</th><th scope="col" class="num">Apply</th></tr></thead>
+                        <tbody>
+                            @{ decimal left = p.Unapplied; }
+                            @for (int i = 0; i < Model.Open.Count; i++)
+                            {
+                                var o = Model.Open[i];
+                                decimal take = Math.Min(o.Balance, left); left -= take;
+                                <tr>
+                                    <td><input type="hidden" name="Apply[@i].SalesInvoiceId" value="@o.SalesInvoiceId" /><strong class="mono">@o.InvoiceNumber</strong></td>
+                                    <td>@o.InvoiceDate.ToString("d MMM yyyy")</td>
+                                    <td class="num">@Money.Inr(o.Balance)</td>
+                                    <td class="num"><input type="text" name="Apply[@i].TdsAmount" inputmode="decimal" class="cell-input" data-amount aria-label="TDS on @o.InvoiceNumber" /></td>
+                                    <td class="num"><input type="text" name="Apply[@i].Amount" value="@(take > 0 ? take.ToString("0.##", CultureInfo.InvariantCulture) : "")" inputmode="decimal" class="cell-input" data-amount aria-label="Apply to @o.InvoiceNumber" /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="actions end"><button type="submit" class="btn primary">Apply <kbd>Ctrl Enter</kbd></button></div>
+            </form>
+        </section>
+    }
+</div>
+
+<article class="invoice-doc receipt-doc @(p.IsReversed ? "cancelled" : null)" data-accent="@s?.AccentColor" aria-label="Payment receipt">
+    <header class="doc-head">
+        <div class="doc-seller">
+            @if (s?.LogoPath is not null) { <img class="doc-logo" src="@FileStore.Url(s.LogoPath)" alt="@s.Name" /> }
+            <div>
+                <h2 class="doc-name">@s?.Name</h2>
+                @if (s is not null && s.LegalName != s.Name) { <p class="doc-legal">@s.LegalName</p> }
+                @if (s is not null) { foreach (var a in s.Address) { <p>@a</p> } }
+                @if (s?.Gstin is not null) { <p><strong>GSTIN</strong> <span class="mono">@s.Gstin</span></p> }
+            </div>
+        </div>
+        <div class="doc-meta">
+            <h1 class="doc-title">PAYMENT RECEIPT</h1>
+            <dl>
+                <dt>Receipt no.</dt><dd class="mono">@p.ReceiptNumber</dd>
+                <dt>Date</dt><dd>@p.PaymentDate.ToString("dd MMM yyyy")</dd>
+            </dl>
+        </div>
+    </header>
+
+    <section class="receipt-body">
+        <p>Received with thanks from <strong>@p.PayerName</strong> the sum of <strong>@Money.Inr(p.Amount)</strong></p>
+        <p class="strong">(@AmountInWords.Rupees(p.Amount))</p>
+        <p>by <strong>@PaymentModes.Name(p.Mode)</strong>@if (p.Reference is not null) { <text>, @(PaymentModes.All.First(m => m.Code == p.Mode).ReferenceLabel) <span class="mono">@p.Reference</span></text> }@if (p.InstrumentDate is { } chq) { <text> dated @chq.ToString("dd MMM yyyy")</text> }@if (p.BankName is not null) { <text>, into @p.BankName ••@p.BankAccountNumber?[^4..]</text> }.</p>
+        @if (p.Mode == PaymentModes.Cheque) { <p class="muted small">Subject to realisation of the cheque.</p> }
+    </section>
+
+    @if (Model.Lines.Count > 0)
+    {
+        <table class="doc-lines">
+            <thead><tr><th scope="col">Against invoice</th><th scope="col">Invoice date</th><th scope="col" class="num">Invoice total</th><th scope="col" class="num">TDS</th><th scope="col" class="num">Received</th></tr></thead>
+            <tbody>
+                @foreach (var l in Model.Lines)
+                {
+                    <tr class="@(l.IsActive ? null : "inactive")">
+                        <td class="mono">@l.InvoiceNumber</td>
+                        <td>@l.InvoiceDate.ToString("dd MMM yyyy")</td>
+                        <td class="num">@Money.Amount(l.GrandTotal)</td>
+                        <td class="num">@(l.TdsAmount == 0 ? "—" : Money.Amount(l.TdsAmount))</td>
+                        <td class="num">@Money.Amount(l.Amount)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <section class="doc-sums">
+        <div class="doc-words">
+            @if (p.Notes is not null) { <p class="label">Note</p><p>@p.Notes</p> }
+        </div>
+        <dl class="doc-totals">
+            <dt>Received</dt><dd>@Money.Amount(p.Amount)</dd>
+            @if (p.TdsAmount > 0) { <dt>TDS deducted by you</dt><dd>@Money.Amount(p.TdsAmount)</dd> }
+            <dt>Applied to invoices</dt><dd>@Money.Amount(active.Sum(l => l.Amount))</dd>
+            @if (p.Unapplied > 0 && !p.IsReversed) { <dt class="strong">Held as advance</dt><dd class="strong">@Money.Inr(p.Unapplied)</dd> }
+        </dl>
+    </section>
+
+    <footer class="doc-foot receipt-foot">
+        <div></div><div></div>
+        <div class="doc-sign">
+            <p>For <strong>@s?.LegalName</strong></p>
+            @if (s?.SignaturePath is not null) { <img src="@FileStore.Url(s.SignaturePath)" alt="Signature" class="doc-signature" /> } else { <span class="sign-space"></span> }
+            <p>@(s?.SignatoryName ?? "")</p>
+            <p class="muted">@(s?.SignatoryTitle ?? "Authorised signatory")</p>
+        </div>
+    </footer>
+    <p class="doc-generated">This is a computer-generated receipt.</p>
+</article>
+
+@if (!p.IsReversed && Model.CanReverse)
+{
+    <dialog id="dlg-reverse" class="dialog" aria-labelledby="dlg-reverse-title" data-open="@(Model.OpenDialog == "reverse" ? "true" : null)">
+        <form method="post" asp-page-handler="Reverse" class="dialog-form" novalidate>
+            <h2 id="dlg-reverse-title">Reverse @p.ReceiptNumber?</h2>
+            <p class="muted">The invoices it settled become unpaid again. The receipt keeps its number, marked reversed, so the register stays complete.</p>
+            @if (Model.Error is not null) { <p class="notice danger">@Model.Error</p> }
+            <input type="hidden" name="Reverse.Id" value="@p.PaymentId" />
+            <label class="field">
+                <span>Reason <span class="req" aria-hidden="true">*</span></span>
+                <input type="text" name="reason" maxlength="200" required placeholder="Cheque bounced" list="reverse-reasons" />
+                <datalist id="reverse-reasons">
+                    <option value="Cheque bounced"></option><option value="Recorded against the wrong customer"></option>
+                    <option value="Recorded twice"></option><option value="Wrong amount entered"></option><option value="Payment refunded"></option>
+                </datalist>
+            </label>
+            <footer class="dialog-actions">
+                <button type="button" class="btn" data-close>Keep it <kbd>Esc</kbd></button>
+                <button type="submit" class="btn danger">Reverse payment</button>
+            </footer>
+        </form>
+    </dialog>
+}
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+    <script src="~/js/form.js" asp-append-version="true"></script>
+    <script src="~/js/dialogs.js" asp-append-version="true"></script>
+    <script src="~/js/invoice-view.js" asp-append-version="true"></script>
+}

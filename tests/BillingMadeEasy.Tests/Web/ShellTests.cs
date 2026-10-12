@@ -28,6 +28,9 @@ public sealed class AppFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
+        // Each test starts its own host; watching appsettings for edits would use one of the
+        // system's ~128 file watchers per host and exhaust them in a full run.
+        builder.UseSetting("hostBuilder:reloadConfigOnChange", "false");
         builder.UseSetting("Auth:Provider", "Demo");
         builder.ConfigureTestServices(services => services.AddSingleton<IAppModule, ProbeInventoryModule>());
     }

@@ -1,0 +1,49 @@
+@page
+@model BillingMadeEasy.Web.Pages.Sales.Payments.IndexModel
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{
+    ViewData["Title"] = "Payments";
+    var s = Model.Result.Summary;
+}
+<header class="page-head">
+    <div>
+        <h1>Payments received</h1>
+        <p class="muted">Search by receipt, customer, UTR or cheque number, or invoice number.</p>
+    </div>
+    @if (Model.CanRecord) { <a class="btn primary" href="/Sales/Payments/Record" data-key="n"><span class="ms" aria-hidden="true">price_check</span>Record payment <kbd>N</kbd></a> }
+</header>
+
+@if (Model.Flash is not null) { <div class="notice" role="status">@Model.Flash</div> }
+
+<section class="stat-strip" aria-label="Summary">
+    <div class="stat-tile"><span class="stat-label">Received this month</span><span class="stat-value">@Money.Inr(s.ReceivedThisMonth)</span><span class="sub">@Money.Inr(s.ReceivedToday) today</span></div>
+    <div class="stat-tile"><span class="stat-label">TDS this month</span><span class="stat-value">@Money.Inr(s.TdsThisMonth)</span><span class="sub">claim it from Form 26AS</span></div>
+    <div class="stat-tile"><span class="stat-label">Cash this month</span><span class="stat-value">@Money.Inr(s.CashThisMonth)</span><span class="sub">should match the cash in hand</span></div>
+    <a class="stat-tile" href="@Model.Link("advance")"><span class="stat-label">Advances held</span><span class="stat-value">@Money.Inr(s.Advances)</span><span class="sub">not yet applied to invoices</span></a>
+</section>
+
+<div class="toolbar">
+    <nav class="segments" aria-label="Show">
+        @foreach (var (key, label) in new[] { ("all", "All"), ("advance", "With advance"), ("reversed", "Reversed") })
+        {
+            <a href="@Model.Link(key)" aria-current="@(Model.CurrentView == key ? "page" : null)">@label</a>
+        }
+    </nav>
+</div>
+
+<form method="get" class="search-row" data-live-search="/Sales/Payments?handler=Rows" role="search">
+    @if (Model.CurrentView != "all") { <input type="hidden" name="view" value="@Model.CurrentView" /> }
+    <label class="search-field">
+        <span class="ms" aria-hidden="true">search</span>
+        <input type="search" name="q" value="@Model.Q" placeholder="Search payments" autocomplete="off" spellcheck="false" autofocus aria-label="Search" />
+        <kbd>↓</kbd>
+    </label>
+</form>
+
+<div data-live-results>
+    <partial name="_PaymentRows" model="Model" />
+</div>
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+}

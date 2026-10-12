@@ -48,6 +48,10 @@
             <button type="button" class="btn" data-print data-key="p"><span class="ms" aria-hidden="true">print</span>Print / PDF <kbd>P</kbd></button>
             @if (Model.CanCreate)
             {
+                @if (i.IsIssued && i.Balance > 0 && Model.CanRecordPayment)
+                {
+                    <a class="btn primary" href="/Sales/Payments/Record?invoiceId=@i.SalesInvoiceId" data-key="r"><span class="ms" aria-hidden="true">price_check</span>Record payment <kbd>R</kbd></a>
+                }
                 <a class="btn" href="/Sales/Invoices/Edit?copy=@i.SalesInvoiceId" data-key="d" title="A new draft with the same customer and lines, dated today"><span class="ms" aria-hidden="true">content_copy</span>Repeat <kbd>D</kbd></a>
             }
             @if (i.IsIssued && Model.CanCancel)
@@ -189,7 +193,12 @@
             @if (i.ReimbursementTotal != 0) { <dt>Reimbursements</dt><dd>@Money.Amount(i.ReimbursementTotal)</dd> }
             @if (i.RoundOff != 0) { <dt>Round off</dt><dd>@(i.RoundOff > 0 ? "+" : "")@Money.Amount(i.RoundOff)</dd> }
             <dt class="grand">Total</dt><dd class="grand">@Money.Inr(i.GrandTotal)</dd>
-            @if (i.AmountPaid > 0) { <dt>Received</dt><dd>@Money.Amount(i.AmountPaid)</dd><dt class="strong">Balance due</dt><dd class="strong">@Money.Inr(i.Balance)</dd> }
+            @if (i.AmountPaid > 0)
+            {
+                <dt>Received</dt><dd>@Money.Amount(i.AmountPaid - i.TdsDeducted)</dd>
+                if (i.TdsDeducted > 0) { <dt>TDS deducted</dt><dd>@Money.Amount(i.TdsDeducted)</dd> }
+                <dt class="strong">Balance due</dt><dd class="strong">@Money.Inr(i.Balance)</dd>
+            }
         </dl>
     </section>
 
@@ -234,6 +243,28 @@
     </footer>
     @if (!i.IsDraft) { <p class="doc-generated">This is a computer-generated invoice.</p> }
 </article>
+
+@if (Model.Payments.Count > 0)
+{
+    <section class="card section no-print" id="payments">
+        <header class="card-head"><h2>Payments <span class="count">@Model.Payments.Count(x => x.IsActive)</span></h2></header>
+        <ul class="item-list">
+            @foreach (var pay in Model.Payments)
+            {
+                <li class="@(pay.IsActive ? null : "inactive")">
+                    <div class="item-main">
+                        <a href="/Sales/Payments/View/@pay.PaymentId" class="mono"><strong>@pay.ReceiptNumber</strong></a>
+                        <span class="sub">
+                            @pay.PaymentDate.ToString("d MMM yyyy") · @BillingMadeEasy.Core.Billing.PaymentModes.Name(pay.Mode)@(pay.Reference is null ? "" : " " + pay.Reference)
+                            @if (!pay.IsActive) { <text>· reversed: @pay.ReverseReason</text> }
+                        </span>
+                    </div>
+                    <span class="num">@Money.Inr(pay.Amount)@if (pay.TdsAmount > 0) { <span class="sub">+ @Money.Inr(pay.TdsAmount) TDS</span> }</span>
+                </li>
+            }
+        </ul>
+    </section>
+}
 
 @if (i.IsIssued && Model.CanCancel)
 {

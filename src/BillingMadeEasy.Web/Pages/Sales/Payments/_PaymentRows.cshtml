@@ -1,0 +1,46 @@
+@model BillingMadeEasy.Web.Pages.Sales.Payments.IndexModel
+@using BillingMadeEasy.Core.Billing
+@using BillingMadeEasy.Web.Features.Sales
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{ var r = Model.Result; }
+@if (r.Total == 0)
+{
+    <section class="empty">
+        <span class="ms empty-icon" aria-hidden="true">@(Model.Q is null ? "payments" : "search_off")</span>
+        <h2>@(Model.Q is not null ? $"No payment matches “{Model.Q}”" : Model.CurrentView == "all" ? "No payments recorded yet" : "Nothing here")</h2>
+        @if (Model.CurrentView == "all" && Model.Q is null)
+        {
+            <p class="muted">When a customer pays, record it here or from the invoice. Their balance and your overdue list update at once.</p>
+        }
+    </section>
+}
+else
+{
+    <p class="result-count muted" aria-live="polite">@r.Total.ToString("N0") @(r.Total == 1 ? "payment" : "payments")</p>
+    <div class="table-wrap">
+        <table class="grid-table" data-row-nav>
+            <thead><tr><th scope="col">Receipt</th><th scope="col">From</th><th scope="col">Date</th><th scope="col">How</th><th scope="col">Against</th><th scope="col" class="num">Amount</th></tr></thead>
+            <tbody>
+                @foreach (var p in r.Rows)
+                {
+                    <tr data-href="/Sales/Payments/View/@p.PaymentId" tabindex="0" class="@(p.Status == PaymentStatus.Reversed ? "inactive" : null)">
+                        <td><a href="/Sales/Payments/View/@p.PaymentId" class="mono"><strong>@p.ReceiptNumber</strong></a> @if (p.Status == PaymentStatus.Reversed) { <span class="badge warn">Reversed</span> }</td>
+                        <td><strong>@p.PayerName</strong></td>
+                        <td>@p.PaymentDate.ToString("d MMM yyyy")</td>
+                        <td>@PaymentModes.Name(p.Mode)@if (p.Reference is not null) { <span class="sub mono">@p.Reference</span> }</td>
+                        <td>@(p.Invoices ?? "—")@if (p.Unapplied > 0) { <span class="sub">@Money.Inr(p.Unapplied) advance</span> }</td>
+                        <td class="num">@Money.Inr(p.Amount)@if (p.TdsAmount > 0) { <span class="sub">+ @Money.Inr(p.TdsAmount) TDS</span> }</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    @if (r.Pages > 1)
+    {
+        <nav class="pager" aria-label="Pages">
+            @if (r.Page > 1) { <a href="@Model.Link(page: r.Page - 1)" rel="prev" data-key="[">‹ Previous <kbd>[</kbd></a> }
+            <span class="muted">Page @r.Page of @r.Pages</span>
+            @if (r.Page < r.Pages) { <a href="@Model.Link(page: r.Page + 1)" rel="next" data-key="]">Next › <kbd>]</kbd></a> }
+        </nav>
+    }
+}

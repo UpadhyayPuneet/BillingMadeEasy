@@ -19,6 +19,9 @@ public sealed class SalesModule : IAppModule
         new("New invoice", "/Sales/Invoices/Edit", "post_add", "Sales.Invoice.Create", Keywords: "add create bill invoice sale", Group: "Create"),
         new("Unpaid invoices", "/Sales/Invoices?view=unpaid", "pending_actions", "Sales.Invoice.View", Keywords: "outstanding receivable due collection", Group: "Find"),
         new("Overdue invoices", "/Sales/Invoices?view=overdue", "running_with_errors", "Sales.Invoice.View", Keywords: "late overdue follow up collection", Group: "Find"),
+        new("Payments", "/Sales/Payments", "payments", "Sales.Payment.View", Shortcut: "y",
+            Keywords: "receipts money received collection upi neft rtgs cheque cash tds advance"),
+        new("Record payment", "/Sales/Payments/Record", "price_check", "Sales.Payment.Record", Keywords: "receive money receipt collection paid upi cheque cash", Group: "Create"),
     ];
 
     public void MapEndpoints(IEndpointRouteBuilder api) { }
@@ -27,5 +30,7 @@ public sealed class SalesModule : IAppModule
     {
         conventions.AuthorizeFolder("/Sales/Invoices", Policies.Permission("Sales.Invoice.View"));
         conventions.AuthorizePage("/Sales/Invoices/Edit", Policies.AnyPermission("Sales.Invoice.Create", "Sales.Invoice.Edit"));
+        conventions.AuthorizeFolder("/Sales/Payments", Policies.Permission("Sales.Payment.View"));
+        conventions.AuthorizePage("/Sales/Payments/Record", Policies.Permission("Sales.Payment.Record"));
     }
 }

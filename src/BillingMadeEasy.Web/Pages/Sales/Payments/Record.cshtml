@@ -1,0 +1,147 @@
+@page
+@model BillingMadeEasy.Web.Pages.Sales.Payments.RecordModel
+@using System.Globalization
+@using BillingMadeEasy.Core.Billing
+@using BillingMadeEasy.Web.Features.Business
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{
+    ViewData["Title"] = "Record payment";
+    var f = Model.Form;
+    string Num(decimal? d) => d is null or 0 ? "" : d.Value.ToString("0.##", CultureInfo.InvariantCulture);
+    decimal advance = Model.Advances.Sum(a => a.Unapplied);
+}
+<header class="page-head">
+    <div>
+        <a class="back" href="/Sales/Payments"><span class="ms" aria-hidden="true">arrow_back</span>Payments</a>
+        <h1>Record payment</h1>
+        <p class="muted small">Money in from a customer. It settles their oldest invoices first; change the split if they told you otherwise.</p>
+    </div>
+</header>
+
+<form method="post" class="sheet-form wide" data-form data-payment-form novalidate autocomplete="off">
+    @if (Model.InvoiceId is long pinned) { <input type="hidden" name="InvoiceId" value="@pinned" /> }
+    <div asp-validation-summary="ModelOnly" class="notice danger" role="alert"></div>
+
+    <div class="inv-head">
+        <section class="form-card">
+            <h2>Received from</h2>
+            <div class="fields">
+                <div class="field">
+                    <label for="payer">Customer <span class="req" aria-hidden="true">*</span></label>
+                    <input type="hidden" name="Form.PartyId" value="@f.PartyId" data-party-id />
+                    <input type="text" id="payer" name="Form.PayerName" value="@(Model.CustomerLabel ?? f.PayerName)" maxlength="200" autofocus="@(f.PartyId is null)"
+                           placeholder="Search customers" spellcheck="false" aria-autocomplete="list"
+                           data-customer-lookup="/Sales/Payments/Record?handler=Customers&q=" data-open-url="/Sales/Payments/Record?handler=Open&partyId=" />
+                    <ul class="lookup-list" role="listbox" hidden data-customer-results></ul>
+                    @Html.ValidationMessage("Form.PartyId", new { @class = "field-error" })
+                </div>
+                <p class="notice" data-advance-note hidden="@(advance <= 0)">
+                    <span data-advance-text>@(advance > 0 ? $"{Model.CustomerLabel} already has {Money.Inr(advance)} paid in advance ({string.Join(", ", Model.Advances.Select(a => a.ReceiptNumber))}). Open that receipt to apply it to invoices." : "")</span>
+                </p>
+            </div>
+        </section>
+
+        <section class="form-card">
+            <h2>Payment</h2>
+            <div class="fields two">
+                <label class="field">
+                    <span>Amount received (₹) <span class="req" aria-hidden="true">*</span></span>
+                    <input type="text" name="Form.Amount" value="@Num(f.Amount)" inputmode="decimal" class="big-amount" data-amount data-pay-amount autofocus="@(f.PartyId is not null)" />
+                    @Html.ValidationMessage("Form.Amount", new { @class = "field-error" })
+                </label>
+                <label class="field">
+                    <span>Received on</span>
+                    <input asp-for="Form.PaymentDate" type="date" max="@Model.Today.ToString("yyyy-MM-dd")" />
+                    @Html.ValidationMessage("Form.PaymentDate", new { @class = "field-error" })
+                </label>
+                <label class="field">
+                    <span>How</span>
+                    <select asp-for="Form.Mode" data-mode>
+                        @foreach (var m in PaymentModes.All) { <option value="@m.Code" data-ref-label="@m.ReferenceLabel">@m.Name</option> }
+                    </select>
+                </label>
+                <label class="field">
+                    <span data-ref-label>@PaymentModes.All.First(m => m.Code == f.Mode).ReferenceLabel</span>
+                    <input asp-for="Form.Reference" class="mono" spellcheck="false" />
+                    @Html.ValidationMessage("Form.Reference", new { @class = "field-error" })
+                </label>
+                <label class="field" data-cheque-only hidden="@(f.Mode != PaymentModes.Cheque)">
+                    <span>Cheque date</span>
+                    <input asp-for="Form.InstrumentDate" type="date" />
+                </label>
+                @if (Model.Accounts.Count > 0)
+                {
+                    <label class="field" data-bank-only hidden="@(f.Mode == PaymentModes.Cash)">
+                        <span>Into account</span>
+                        <select asp-for="Form.BankAccountId">
+                            @foreach (var a in Model.Accounts) { <option value="@a.BankAccountId">@a.BankName @a.Masked</option> }
+                        </select>
+                    </label>
+                }
+                <label class="field span-2"><span>Note</span><input asp-for="Form.Notes" placeholder="Anything worth remembering about this payment" /></label>
+                <p class="field-help span-2" data-cash-help hidden="@(f.Mode != PaymentModes.Cash)">Cash of ₹2 lakh or more from one person in a day isn't allowed (Income Tax Act s.269ST). Take larger amounts by bank, UPI or cheque.</p>
+            </div>
+        </section>
+    </div>
+
+    <section class="form-card">
+        <header class="card-head">
+            <h2>Settles</h2>
+            <div class="actions">
+                <button type="button" class="btn small" data-allocate-oldest>Oldest first</button>
+                <button type="button" class="btn small" data-allocate-clear>Clear</button>
+            </div>
+        </header>
+        <p class="muted small">If the customer deducted TDS, enter it against the invoice: it counts as paid, and you claim it from Form 26AS.</p>
+        <p class="empty-inline" data-no-open hidden="@(Model.Open.Count > 0)">@(f.PartyId is null ? "Choose a customer to see what they owe." : "Nothing outstanding. The whole amount will be kept as an advance.")</p>
+        <div class="table-wrap" data-open-wrap hidden="@(Model.Open.Count == 0)">
+            <table class="grid-table alloc-table">
+                <thead>
+                    <tr><th scope="col">Invoice</th><th scope="col">Date</th><th scope="col">Due</th><th scope="col" class="num">Balance</th><th scope="col" class="num">TDS</th><th scope="col" class="num">Received</th></tr>
+                </thead>
+                <tbody data-open-rows>
+                    @for (int i = 0; i < Model.Open.Count; i++)
+                    {
+                        var o = Model.Open[i];
+                        var a = f.Allocations.FirstOrDefault(x => x.SalesInvoiceId == o.SalesInvoiceId);
+                        <tr data-alloc data-balance="@o.Balance.ToString(CultureInfo.InvariantCulture)" data-pinned="@(o.SalesInvoiceId == Model.InvoiceId ? "true" : null)">
+                            <td><input type="hidden" name="Form.Allocations[@i].SalesInvoiceId" value="@o.SalesInvoiceId" /><strong class="mono">@o.InvoiceNumber</strong></td>
+                            <td>@o.InvoiceDate.ToString("d MMM yyyy")</td>
+                            <td>@if (o.DaysOverdue is int d) { <span class="badge warn">@d days overdue</span> } else { @(o.DueDate?.ToString("d MMM") ?? "On receipt") }</td>
+                            <td class="num">@Money.Inr(o.Balance)</td>
+                            <td class="num"><input type="text" name="Form.Allocations[@i].TdsAmount" value="@Num(a?.TdsAmount)" inputmode="decimal" class="cell-input" aria-label="TDS on @o.InvoiceNumber" data-amount data-tds /></td>
+                            <td class="num"><input type="text" name="Form.Allocations[@i].Amount" value="@Num(a?.Amount)" inputmode="decimal" class="cell-input" aria-label="Received against @o.InvoiceNumber" data-amount data-apply /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <dl class="inv-totals pay-totals" aria-live="polite">
+            <dt>Applied to invoices</dt><dd data-t="applied">—</dd>
+            <dt>TDS</dt><dd data-t="tds">—</dd>
+            <dt>Kept as advance</dt><dd data-t="advance">—</dd>
+            <dd class="words bad" data-t="over"></dd>
+        </dl>
+    </section>
+
+    <footer class="action-bar">
+        <a class="btn" href="/Sales/Payments" data-cancel>Cancel <kbd>Esc</kbd></a>
+        <button type="submit" class="btn primary">Record payment <kbd>Ctrl Enter</kbd></button>
+    </footer>
+</form>
+
+<template id="alloc-row">
+    <tr data-alloc data-balance="0">
+        <td><input type="hidden" data-name="SalesInvoiceId" /><strong class="mono" data-f="number"></strong></td>
+        <td data-f="date"></td>
+        <td data-f="due"></td>
+        <td class="num" data-f="balance"></td>
+        <td class="num"><input type="text" data-name="TdsAmount" inputmode="decimal" class="cell-input" aria-label="TDS" data-amount data-tds /></td>
+        <td class="num"><input type="text" data-name="Amount" inputmode="decimal" class="cell-input" aria-label="Received" data-amount data-apply /></td>
+    </tr>
+</template>
+
+@section Scripts {
+    <script src="~/js/form.js" asp-append-version="true"></script>
+    <script src="~/js/payment.js" asp-append-version="true"></script>
+}

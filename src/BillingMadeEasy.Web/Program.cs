@@ -59,6 +59,7 @@ services.AddScoped<BillingMadeEasy.Web.Features.Team.TeamStore>();
 services.AddScoped<BillingMadeEasy.Web.Features.Catalog.CatalogStore>();
 services.AddScoped<BillingMadeEasy.Web.Features.Business.BusinessStore>();
 services.AddScoped<BillingMadeEasy.Web.Features.Sales.InvoiceStore>();
+services.AddScoped<BillingMadeEasy.Web.Features.Sales.PaymentStore>();
 services.AddScoped<BillingMadeEasy.Web.Features.Sales.InvoiceBuilder>();
 services.AddScoped<BillingMadeEasy.Web.Features.Team.InviteSender>();
 services.AddScoped<AccountTokens>();

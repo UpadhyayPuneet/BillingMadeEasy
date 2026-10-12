@@ -102,3 +102,4 @@ so running one again does no harm.
 | `35_offering_barcode_check.sql` | A duplicate barcode is refused with the name of the item that has it |
 | `36_business_profiles.sql` | Your business: invoicing profiles (GSTIN, address, logo, signature, terms), bank accounts, numbering per profile with the 16-character rule; fixes number padding wrapping at 10,000 |
 | `37_sales_invoices.sql` | Sales invoices: drafts, issue with a gap-free number and the seller frozen onto the invoice, cancel keeping the number, list with outstanding/overdue, agreed and last-sold prices, plan limit, place-of-supply code 96 for exports |
+| `38_payments_received.sql` | Payments received: one payment across several invoices, TDS kept apart, advances and applying them, receipt numbers, reversal with reason, duplicate UTR and s.269ST cash checks |

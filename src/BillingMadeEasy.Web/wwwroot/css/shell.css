@@ -682,3 +682,16 @@ a.stat-tile:hover { text-decoration: none; border-color: var(--accent); }
     .inv-line .remove { position: absolute; right: 0; top: var(--space-3); margin: 0; grid-column: auto; grid-row: auto; }
 }
 .inv-line .amount { display: block; }
+
+/* ── Payments ── */
+.big-amount { font-size: 22px !important; font-weight: 700; font-variant-numeric: tabular-nums; }
+.alloc-table .cell-input { width: 120px; text-align: right; font: inherit; font-variant-numeric: tabular-nums; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--surface); color: var(--text); }
+.alloc-table .cell-input:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus); }
+.alloc-table tr.over .cell-input { border-color: var(--danger); }
+.pay-totals { max-width: 380px; margin: var(--space-4) 0 0 auto; }
+.pay-totals .bad { color: var(--danger); }
+.actions.end { justify-content: flex-end; margin-top: var(--space-3); }
+.receipt-body { padding: 20px 0; display: grid; gap: 6px; font-size: 14px; line-height: 1.6; }
+.receipt-foot { grid-template-columns: 1fr 1fr 1fr; }
+.item-list li.inactive { opacity: .6; }
+.search-trigger span:not(.ms) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BillingMadeEasy.Web.Pages.Sales.Invoices;
 
-public sealed class ViewModel(InvoiceStore invoices, BusinessStore business, EntitlementService entitlements) : TenantPageModel
+public sealed class ViewModel(InvoiceStore invoices, BusinessStore business, EntitlementService entitlements, PaymentStore payments) : TenantPageModel
 {
     [BindProperty(SupportsGet = true)] public long Id { get; set; }
 
@@ -23,6 +23,8 @@ public sealed class ViewModel(InvoiceStore invoices, BusinessStore business, Ent
     public bool CanIssue => Can("Sales.Invoice.Issue");
     public bool CanCancel => Can("Sales.Invoice.Cancel");
     public bool CanCreate => Can("Sales.Invoice.Create");
+    public bool CanRecordPayment => Can("Sales.Payment.Record");
+    public IReadOnlyList<InvoicePayment> Payments { get; private set; } = [];
 
     public async Task<IActionResult> OnGetAsync(CancellationToken ct) => await LoadAsync(ct) ? Page() : NotFound();
 
@@ -59,6 +61,7 @@ public sealed class ViewModel(InvoiceStore invoices, BusinessStore business, Ent
         if (invoice is null) return false;
         Invoice = invoice;
         Lines = lines;
+        if (Can("Sales.Payment.View")) Payments = await payments.ForInvoiceAsync(TenantId, Id, ct);
 
         // Issued: exactly what was printed then. Draft: today's details.
         Seller = Features.Sales.Seller.FromJson(invoice.SellerSnapshot);

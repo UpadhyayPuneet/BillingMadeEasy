@@ -88,6 +88,7 @@ public sealed class Invoice
     public decimal RoundOff { get; init; }
     public decimal GrandTotal { get; init; }
     public decimal AmountPaid { get; init; }
+    public decimal TdsDeducted { get; init; }
     public string? SellerSnapshot { get; init; }
     public DateTime? IssuedAtUtc { get; init; }
     public string? IssuedByName { get; init; }
