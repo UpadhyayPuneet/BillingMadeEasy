@@ -9,6 +9,7 @@
     var f = Model.Form;
     string Num(decimal? d) => d is null or 0 ? "" : d.Value.ToString("0.##", CultureInfo.InvariantCulture);
     decimal advance = Model.Advances.Sum(a => a.Unapplied);
+    decimal credit = Model.Credits.Sum(c => c.CreditLeft);
 }
 <header class="page-head">
     <div>
@@ -37,6 +38,9 @@
                 </div>
                 <p class="notice" data-advance-note hidden="@(advance <= 0)">
                     <span data-advance-text>@(advance > 0 ? $"{Model.CustomerLabel} already has {Money.Inr(advance)} paid in advance ({string.Join(", ", Model.Advances.Select(a => a.ReceiptNumber))}). Open that receipt to apply it to invoices." : "")</span>
+                </p>
+                <p class="notice" data-credit-note hidden="@(credit <= 0)">
+                    <span data-credit-text>@(credit > 0 ? $"{Model.CustomerLabel} has {Money.Inr(credit)} of credit from credit notes ({string.Join(", ", Model.Credits.Select(c => c.NoteNumber))}). Open the credit note to apply it to invoices; they may be paying less because of it." : "")</span>
                 </p>
             </div>
         </section>

@@ -688,6 +688,9 @@ a.stat-tile:hover { text-decoration: none; border-color: var(--accent); }
 .alloc-table .cell-input { width: 120px; text-align: right; font: inherit; font-variant-numeric: tabular-nums; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--surface); color: var(--text); }
 .alloc-table .cell-input:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus); }
 .alloc-table tr.over .cell-input { border-color: var(--danger); }
+.credit-table .cell-input { width: 104px; }
+.credit-table tr.over [data-f="tax"] { color: var(--danger); font-size: 12px; }
+.credit-table tr.inactive .cell-input { visibility: hidden; }
 .pay-totals { max-width: 380px; margin: var(--space-4) 0 0 auto; }
 .pay-totals .bad { color: var(--danger); }
 .actions.end { justify-content: flex-end; margin-top: var(--space-3); }

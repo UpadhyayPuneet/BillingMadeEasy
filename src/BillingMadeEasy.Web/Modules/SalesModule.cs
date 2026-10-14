@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc.ApplicationModels;
 
 namespace BillingMadeEasy.Web.Modules;
 
-/// <summary>GST invoices. The Billing module: on by plan or add-on.</summary>
+/// <summary>GST invoices, payments received and credit notes. The Billing module: on by plan or add-on.</summary>
 public sealed class SalesModule : IAppModule
 {
     public string Key => ModuleKeys.Billing;
@@ -22,6 +22,8 @@ public sealed class SalesModule : IAppModule
         new("Payments", "/Sales/Payments", "payments", "Sales.Payment.View", Shortcut: "y",
             Keywords: "receipts money received collection upi neft rtgs cheque cash tds advance"),
         new("Record payment", "/Sales/Payments/Record", "price_check", "Sales.Payment.Record", Keywords: "receive money receipt collection paid upi cheque cash", Group: "Create"),
+        new("Credit notes", "/Sales/CreditNotes", "assignment_return", "Sales.CreditNote.View", Shortcut: "n",
+            Keywords: "credit note sales return goods returned discount after sale refund correction gst s.34"),
     ];
 
     public void MapEndpoints(IEndpointRouteBuilder api) { }
@@ -32,5 +34,7 @@ public sealed class SalesModule : IAppModule
         conventions.AuthorizePage("/Sales/Invoices/Edit", Policies.AnyPermission("Sales.Invoice.Create", "Sales.Invoice.Edit"));
         conventions.AuthorizeFolder("/Sales/Payments", Policies.Permission("Sales.Payment.View"));
         conventions.AuthorizePage("/Sales/Payments/Record", Policies.Permission("Sales.Payment.Record"));
+        conventions.AuthorizeFolder("/Sales/CreditNotes", Policies.Permission("Sales.CreditNote.View"));
+        conventions.AuthorizePage("/Sales/CreditNotes/New", Policies.Permission("Sales.CreditNote.Manage"));
     }
 }

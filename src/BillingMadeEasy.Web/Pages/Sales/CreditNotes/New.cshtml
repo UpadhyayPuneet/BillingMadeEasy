@@ -1,0 +1,162 @@
+@page
+@model BillingMadeEasy.Web.Pages.Sales.CreditNotes.NewModel
+@using System.Globalization
+@using BillingMadeEasy.Core.Billing
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{
+    var inv = Model.Invoice;
+    var f = Model.Form;
+    ViewData["Title"] = $"Credit note · {inv.InvoiceNumber}";
+    string Num(decimal? d) => d is null or 0 ? "" : d.Value.ToString("0.####", CultureInfo.InvariantCulture);
+    string Qty(decimal q) => (q / 1.0000000000000000000000000000m).ToString("#,##0.####", CultureInfo.GetCultureInfo("en-IN"));
+    string Inv(decimal d) => d.ToString(CultureInfo.InvariantCulture);
+    var maxDate = Model.PastDeadline ? Model.LastDate : Model.Today;
+}
+<header class="page-head">
+    <div>
+        <a class="back" href="/Sales/Invoices/View/@inv.SalesInvoiceId"><span class="ms" aria-hidden="true">arrow_back</span>@inv.InvoiceNumber</a>
+        <h1>Credit note</h1>
+        <p class="muted small">
+            Against <strong class="mono">@inv.InvoiceNumber</strong> of @inv.InvoiceDate.ToString("d MMM yyyy") to <strong>@inv.BuyerName</strong>:
+            total @Money.Inr(inv.GrandTotal), @(inv.Balance > 0 ? $"{Money.Inr(inv.Balance)} still owed" : "fully settled")@(Model.CreditedBefore > 0 ? $", {Money.Inr(Model.CreditedBefore)} credited before" : "").
+        </p>
+    </div>
+</header>
+
+@if (Model.Flash is not null) { <div class="notice warn" role="status">@Model.Flash</div> }
+
+@if (Model.NothingLeft)
+{
+    <section class="empty">
+        <span class="ms empty-icon" aria-hidden="true">task_alt</span>
+        <h2>Everything on @inv.InvoiceNumber has been credited</h2>
+        <p class="muted">There is nothing left on it to take back. @(Model.Earlier.Count > 0 ? "Its credit notes are listed on the invoice." : "")</p>
+        <p><a class="btn" href="/Sales/Invoices/View/@inv.SalesInvoiceId">Back to the invoice</a></p>
+    </section>
+}
+else if (Model.PastDeadline)
+{
+    <section class="empty">
+        <span class="ms empty-icon" aria-hidden="true">event_busy</span>
+        <h2>Too late for a GST credit note</h2>
+        <p class="muted">GST allows a credit note against an invoice only until 30 November after the end of its financial year (s.34) — for @inv.InvoiceNumber that was @Model.LastDate.ToString("d MMM yyyy"). After that, the tax can't be reduced. Give the customer a commercial discount on a future invoice instead.</p>
+        <p><a class="btn" href="/Sales/Invoices/View/@inv.SalesInvoiceId">Back to the invoice</a></p>
+    </section>
+}
+else
+{
+<form method="post" class="sheet-form wide" data-form data-credit-form novalidate autocomplete="off"
+      data-inter="@(inv.IsInterState ? "true" : "false")" data-round="@(inv.RoundOffTotal ? "true" : "false")"
+      data-invoice-total="@Inv(inv.GrandTotal)" data-credited-before="@Inv(Model.CreditedBefore)" data-balance="@Inv(Math.Max(0, inv.Balance))"
+      data-invoice-number="@inv.InvoiceNumber">
+    <input type="hidden" name="InvoiceId" value="@inv.SalesInvoiceId" />
+    <div asp-validation-summary="ModelOnly" class="notice danger" role="alert"></div>
+
+    <div class="inv-head">
+        <section class="form-card">
+            <h2>Why</h2>
+            <div class="choice-list" role="radiogroup" aria-label="Reason">
+                @foreach (var r in CreditNoteReasons.All)
+                {
+                    <label class="choice-row">
+                        <input type="radio" name="Form.ReasonCode" value="@r.Code" checked="@(f.ReasonCode == r.Code)" data-reason />
+                        <span class="choice-text"><strong>@r.Name</strong><span class="muted small">@r.Hint</span></span>
+                    </label>
+                }
+            </div>
+            @Html.ValidationMessage("Form.ReasonCode", new { @class = "field-error" })
+        </section>
+
+        <section class="form-card">
+            <h2>Details</h2>
+            <div class="fields">
+                <label class="field">
+                    <span>Credit note date</span>
+                    <input type="date" name="Form.NoteDate" value="@f.NoteDate?.ToString("yyyy-MM-dd")" min="@inv.InvoiceDate.ToString("yyyy-MM-dd")" max="@maxDate.ToString("yyyy-MM-dd")" />
+                    <span class="field-help">GST allows a credit note against this invoice until @Model.LastDate.ToString("d MMM yyyy").</span>
+                    @Html.ValidationMessage("Form.NoteDate", new { @class = "field-error" })
+                </label>
+                <label class="field">
+                    <span>Reason, as printed <span class="muted" data-reason-optional>(optional)</span></span>
+                    <input type="text" name="Form.ReasonText" value="@f.ReasonText" maxlength="300" placeholder="e.g. 3 cartons damaged in transit" data-reason-text />
+                    @Html.ValidationMessage("Form.ReasonText", new { @class = "field-error" })
+                </label>
+                <label class="field">
+                    <span>Note</span>
+                    <input type="text" name="Form.Notes" value="@f.Notes" maxlength="1000" placeholder="Anything else the customer should read" />
+                </label>
+            </div>
+        </section>
+    </div>
+
+    <section class="form-card">
+        <header class="card-head">
+            <h2>What is credited</h2>
+            <div class="actions">
+                <button type="button" class="btn small" data-credit-all title="Credit everything still left on the invoice">Everything left</button>
+                <button type="button" class="btn small" data-credit-clear>Clear</button>
+            </div>
+        </header>
+        <p class="muted small" data-help-return>Enter the quantity that came back; its value fills in at the invoiced rate. Tax comes back at the invoice's rate.</p>
+        <div class="table-wrap">
+            <table class="grid-table alloc-table credit-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Item</th>
+                        <th scope="col" class="num">Billed</th>
+                        <th scope="col" class="num">Left to credit</th>
+                        <th scope="col" class="num">Quantity</th>
+                        <th scope="col" class="num">Value before GST (₹)</th>
+                        <th scope="col" class="num">GST</th>
+                        <th scope="col" class="num">Credit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < Model.Lines.Count; i++)
+                    {
+                        var l = Model.Lines[i];
+                        var e = i < f.Lines.Count ? f.Lines[i] : new BillingMadeEasy.Web.Pages.Sales.CreditNotes.NewModel.LineForm();
+                        bool done = l.TaxableLeft <= 0;
+                        <tr data-credit-line class="@(done ? "inactive" : null)"
+                            data-qty-left="@Inv(l.QuantityLeft)" data-taxable-left="@Inv(l.TaxableLeft)"
+                            data-unit="@Inv(l.Quantity == 0 ? 0 : l.TaxableValue / l.Quantity)" data-rate="@Inv(l.IsPureAgent ? 0 : l.TaxRatePercent)"
+                            data-tax-left="@Inv(l.CgstAmount + l.SgstAmount + l.IgstAmount - l.CreditedCgst - l.CreditedSgst - l.CreditedIgst)">
+                            <td>
+                                <input type="hidden" name="Form.Lines[@i].SalesInvoiceLineId" value="@l.SalesInvoiceLineId" />
+                                <strong>@l.Description</strong>
+                                <span class="sub">@(l.HsnSacCode is null ? "" : "HSN/SAC " + l.HsnSacCode + " · ")@Money.Amount(l.Rate) / @(l.UnitCode ?? "unit")@(l.IsPureAgent ? " · reimbursement" : "")</span>
+                                @Html.ValidationMessage($"Form.Lines[{i}].Taxable", new { @class = "field-error" })
+                            </td>
+                            <td class="num">@Qty(l.Quantity) @l.UnitCode<span class="sub">@Money.Amount(l.TaxableValue)</span></td>
+                            <td class="num">@(done ? "—" : $"{Qty(l.QuantityLeft)} {l.UnitCode}")<span class="sub">@(done ? "all credited" : Money.Amount(l.TaxableLeft))</span></td>
+                            <td class="num"><input type="text" name="Form.Lines[@i].Quantity" value="@Num(e.Quantity)" inputmode="decimal" class="cell-input" aria-label="Quantity credited, @l.Description" data-qty disabled="@done" /></td>
+                            <td class="num"><input type="text" name="Form.Lines[@i].Taxable" value="@Num(e.Taxable)" inputmode="decimal" class="cell-input" aria-label="Value credited before GST, @l.Description" data-amount data-taxable disabled="@done" /></td>
+                            <td class="num" data-f="tax">—</td>
+                            <td class="num" data-f="total">—</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <dl class="inv-totals pay-totals" aria-live="polite">
+            <dt>Value before GST</dt><dd data-t="taxable">—</dd>
+            @if (inv.IsInterState) { <dt>IGST</dt><dd data-t="igst">—</dd> }
+            else { <dt>CGST</dt><dd data-t="cgst">—</dd><dt>SGST</dt><dd data-t="sgst">—</dd> }
+            <dt data-roundoff-label hidden>Round off</dt><dd data-t="round" hidden>—</dd>
+            <dt class="grand">Credit note total</dt><dd class="grand" data-t="grand">—</dd>
+            <dd class="words" data-t="effect"></dd>
+        </dl>
+    </section>
+
+    <footer class="action-bar">
+        <a class="btn" href="/Sales/Invoices/View/@inv.SalesInvoiceId" data-cancel>Cancel <kbd>Esc</kbd></a>
+        <span class="muted small">It gets the next credit note number when issued.</span>
+        <button type="submit" class="btn primary">Issue credit note <kbd>Ctrl Enter</kbd></button>
+    </footer>
+</form>
+}
+
+@section Scripts {
+    <script src="~/js/form.js" asp-append-version="true"></script>
+    <script src="~/js/credit-note.js" asp-append-version="true"></script>
+}

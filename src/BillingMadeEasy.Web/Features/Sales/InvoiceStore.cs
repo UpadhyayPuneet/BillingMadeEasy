@@ -89,6 +89,7 @@ public sealed class Invoice
     public decimal GrandTotal { get; init; }
     public decimal AmountPaid { get; init; }
     public decimal TdsDeducted { get; init; }
+    public decimal CreditedAmount { get; init; }
     public string? SellerSnapshot { get; init; }
     public DateTime? IssuedAtUtc { get; init; }
     public string? IssuedByName { get; init; }
@@ -104,6 +105,8 @@ public sealed class Invoice
     public bool IsCancelled => Status == InvoiceStatus.Cancelled;
     public decimal TaxTotal => CgstTotal + SgstTotal + IgstTotal;
     public decimal Balance => GrandTotal - AmountPaid;
+    /// <summary>Money actually received: what is settled, less TDS and credit notes.</summary>
+    public decimal Received => AmountPaid - TdsDeducted - CreditedAmount;
 }
 
 public sealed class InvoiceLine

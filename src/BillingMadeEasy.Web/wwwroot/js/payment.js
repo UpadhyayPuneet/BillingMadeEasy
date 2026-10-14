@@ -117,6 +117,10 @@
         note.hidden = !(data.advance > 0);
         if (data.advance > 0) $('[data-advance-text]', form).textContent = input.value + ' already has ' + inr.format(data.advance) +
             ' paid in advance (' + data.advanceReceipts.join(', ') + '). Open that receipt to apply it to invoices.';
+        var credit = $('[data-credit-note]', form);
+        credit.hidden = !(data.credit > 0);
+        if (data.credit > 0) $('[data-credit-text]', form).textContent = input.value + ' has ' + inr.format(data.credit) +
+            ' of credit from credit notes (' + data.creditNotes.join(', ') + '). Open the credit note to apply it to invoices; they may be paying less because of it.';
         manual = false;
         if (!total.value) {
             var owed = data.invoices.reduce(function (s, i) { return s + i.balance; }, 0);

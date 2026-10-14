@@ -1,0 +1,342 @@
+@page "{id:long}"
+@model BillingMadeEasy.Web.Pages.Sales.CreditNotes.ViewModel
+@using System.Globalization
+@using BillingMadeEasy.Core.Billing
+@using BillingMadeEasy.Core.Tax
+@using BillingMadeEasy.Web.Infrastructure.Files
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{
+    var n = Model.Note;
+    var s = Model.Seller;
+    ViewData["Title"] = $"{n.NoteNumber} · {n.BuyerName}";
+    string Qty(decimal q) => (q / 1.0000000000000000000000000000m).ToString("#,##0.####", CultureInfo.GetCultureInfo("en-IN"));
+    string Pct(decimal p) => (p / 1.0000000000000000000000000000m).ToString("0.##", CultureInfo.InvariantCulture) + "%";
+    string? StateLine(string? code) => code is null ? null : $"{StateCodes.Name(code) ?? code} ({code})";
+    bool inter = n.IsInterState;
+    bool anyQty = Model.Lines.Any(l => l.Quantity > 0);
+    string reason = CreditNoteReasons.Name(n.ReasonCode) + (n.ReasonText is null ? "" : ": " + n.ReasonText);
+}
+<div class="doc-chrome no-print">
+    <header class="page-head">
+        <div>
+            <a class="back" href="/Sales/CreditNotes"><span class="ms" aria-hidden="true">arrow_back</span>Credit notes</a>
+            <h1>
+                @n.NoteNumber
+                @if (n.IsCancelled) { <span class="badge warn">Cancelled</span> }
+                else if (n.CreditLeft > 0) { <span class="badge">Credit left @Money.Inr(n.CreditLeft)</span> }
+                else { <span class="badge success">Settled</span> }
+            </h1>
+            <p class="muted small">
+                @if (n.IsCancelled) { <text>Cancelled @When.Ago(n.CancelledAtUtc) by @n.CancelledByName: “@n.CancelReason”</text> }
+                else { <text>Issued @When.Ago(n.CreatedAtUtc) by @n.CreatedByName against <a href="/Sales/Invoices/View/@n.SalesInvoiceId" class="mono">@n.InvoiceNumber</a></text> }
+            </p>
+        </div>
+        <div class="actions">
+            <button type="button" class="btn" data-print data-key="p"><span class="ms" aria-hidden="true">print</span>Print / PDF <kbd>P</kbd></button>
+            <a class="btn" href="/Sales/Invoices/View/@n.SalesInvoiceId" data-key="i"><span class="ms" aria-hidden="true">receipt_long</span>Invoice <kbd>I</kbd></a>
+            @if (!n.IsCancelled && Model.CanManage)
+            {
+                @if (n.CreditLeft > 0)
+                {
+                    <button type="button" class="btn" data-dialog="refund" data-key="f"><span class="ms" aria-hidden="true">currency_rupee</span>Refund <kbd>F</kbd></button>
+                }
+                <button type="button" class="btn" data-dialog="cancel"><span class="ms" aria-hidden="true">block</span>Cancel</button>
+            }
+        </div>
+    </header>
+    @if (Model.Flash is not null) { <div class="notice" role="status">@Model.Flash</div> }
+
+    @if (Model.Open.Count > 0)
+    {
+        <section class="card section" id="apply">
+            <header class="card-head"><h2>Apply the credit <span class="count">@Money.Inr(n.CreditLeft)</span></h2></header>
+            <p class="muted small">@n.BuyerName has other invoices open. Apply the credit to them, oldest first, or refund it.</p>
+            <form method="post" asp-page-handler="Apply" data-form>
+                <div class="table-wrap">
+                    <table class="grid-table alloc-table">
+                        <thead><tr><th scope="col">Invoice</th><th scope="col">Date</th><th scope="col" class="num">Balance</th><th scope="col" class="num">Apply</th></tr></thead>
+                        <tbody>
+                            @{ decimal left = n.CreditLeft; }
+                            @for (int i = 0; i < Model.Open.Count; i++)
+                            {
+                                var o = Model.Open[i];
+                                decimal take = Math.Min(o.Balance, left); left -= take;
+                                <tr>
+                                    <td><input type="hidden" name="Apply[@i].SalesInvoiceId" value="@o.SalesInvoiceId" /><strong class="mono">@o.InvoiceNumber</strong></td>
+                                    <td>@o.InvoiceDate.ToString("d MMM yyyy")@if (o.DaysOverdue is int d) { <span class="badge warn">@d days overdue</span> }</td>
+                                    <td class="num">@Money.Inr(o.Balance)</td>
+                                    <td class="num"><input type="text" name="Apply[@i].Amount" value="@(take > 0 ? take.ToString("0.##", CultureInfo.InvariantCulture) : "")" inputmode="decimal" class="cell-input" data-amount aria-label="Apply to @o.InvoiceNumber" /></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="actions end"><button type="submit" class="btn primary">Apply <kbd>Ctrl Enter</kbd></button></div>
+            </form>
+        </section>
+    }
+</div>
+
+<article class="invoice-doc @(n.IsCancelled ? "cancelled" : null)" data-accent="@s?.AccentColor" aria-label="Credit note">
+    <header class="doc-head">
+        <div class="doc-seller">
+            @if (s?.LogoPath is not null) { <img class="doc-logo" src="@FileStore.Url(s.LogoPath)" alt="@s.Name" /> }
+            <div>
+                <h2 class="doc-name">@(s?.Name)</h2>
+                @if (s is not null && s.LegalName != s.Name) { <p class="doc-legal">@s.LegalName</p> }
+                @if (s is not null) { foreach (var a in s.Address) { <p>@a</p> } }
+                <p>@string.Join(" · ", new[] { s?.Phone, s?.Email }.Where(x => !string.IsNullOrWhiteSpace(x)))</p>
+                @if (s?.Gstin is not null) { <p><strong>GSTIN</strong> <span class="mono">@s.Gstin</span> · <strong>PAN</strong> <span class="mono">@s.Pan</span></p> }
+            </div>
+        </div>
+        <div class="doc-meta">
+            <h1 class="doc-title">CREDIT NOTE</h1>
+            <dl>
+                <dt>Credit note no.</dt><dd class="mono">@n.NoteNumber</dd>
+                <dt>Date</dt><dd>@n.NoteDate.ToString("dd MMM yyyy")</dd>
+                <dt>Against @(n.InvoiceDocumentType == DocumentTypes.BillOfSupply ? "bill of supply" : "invoice")</dt><dd class="mono">@n.InvoiceNumber</dd>
+                <dt>Invoice date</dt><dd>@n.InvoiceDate.ToString("dd MMM yyyy")</dd>
+                <dt>Place of supply</dt><dd>@(StateLine(n.PlaceOfSupply) ?? "—")</dd>
+                <dt>Reverse charge</dt><dd>@(n.IsReverseCharge ? "Yes" : "No")</dd>
+            </dl>
+        </div>
+    </header>
+
+    <section class="doc-parties">
+        <div>
+            <h3>Issued to</h3>
+            <p class="strong">@n.BuyerName</p>
+            @if (n.BuyerAddress is not null) { <p class="pre">@n.BuyerAddress</p> }
+            @if (StateLine(n.BuyerStateCode) is { } bs) { <p>State: @bs</p> }
+            @if (n.BuyerGstin is not null) { <p><strong>GSTIN</strong> <span class="mono">@n.BuyerGstin</span></p> } else { <p class="muted">Unregistered</p> }
+        </div>
+        <div>
+            <h3>Reason</h3>
+            <p>@reason</p>
+        </div>
+    </section>
+
+    <table class="doc-lines">
+        <thead>
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">Description</th>
+                <th scope="col">HSN/SAC</th>
+                @if (anyQty) { <th scope="col" class="num">Qty</th> }
+                <th scope="col" class="num">Taxable value</th>
+                @if (!n.IsComposition) { <th scope="col" class="num">GST</th> }
+                <th scope="col" class="num">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var l in Model.Lines)
+            {
+                <tr>
+                    <td>@l.LineNumber</td>
+                    <td>@l.Description@if (l.IsPureAgent) { <span class="sub">Reimbursement at actuals, as pure agent</span> } else if (l.Quantity == 0) { <span class="sub">Value only</span> }</td>
+                    <td class="mono">@l.HsnSacCode</td>
+                    @if (anyQty) { <td class="num">@(l.Quantity == 0 ? "—" : $"{Qty(l.Quantity)} {l.UnitCode}")</td> }
+                    <td class="num">@Money.Amount(l.TaxableValue)</td>
+                    @if (!n.IsComposition) { <td class="num">@(l.IsPureAgent ? "—" : Pct(l.TaxRatePercent))</td> }
+                    <td class="num">@Money.Amount(l.LineTotal)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <section class="doc-sums">
+        <div class="doc-words">
+            <p class="label">Amount in words</p>
+            <p class="strong">@AmountInWords.Rupees(n.GrandTotal)</p>
+            @if (!n.IsComposition && Model.TaxSummary.Count > 0 && n.TaxTotal > 0)
+            {
+                <table class="doc-taxsum">
+                    <thead>
+                        <tr>
+                            <th scope="col">HSN/SAC</th><th scope="col" class="num">Taxable</th>
+                            @if (inter) { <th scope="col" class="num">IGST</th> }
+                            else { <th scope="col" class="num">CGST</th><th scope="col" class="num">SGST</th> }
+                            <th scope="col" class="num">Total tax</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in Model.TaxSummary)
+                        {
+                            <tr>
+                                <td class="mono">@(t.HsnSacCode ?? "—")</td>
+                                <td class="num">@Money.Amount(t.Taxable)</td>
+                                @if (inter) { <td class="num">@Pct(t.RatePercent) · @Money.Amount(t.Igst)</td> }
+                                else { <td class="num">@Pct(t.RatePercent / 2) · @Money.Amount(t.Cgst)</td><td class="num">@Pct(t.RatePercent / 2) · @Money.Amount(t.Sgst)</td> }
+                                <td class="num">@Money.Amount(t.Tax)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+        <dl class="doc-totals">
+            <dt>Taxable value</dt><dd>@Money.Amount(n.TaxableTotal)</dd>
+            @if (!n.IsComposition)
+            {
+                if (inter) { <dt>IGST</dt><dd>@Money.Amount(n.IgstTotal)</dd> }
+                else { <dt>CGST</dt><dd>@Money.Amount(n.CgstTotal)</dd><dt>SGST</dt><dd>@Money.Amount(n.SgstTotal)</dd> }
+            }
+            @if (n.ReimbursementTotal != 0) { <dt>Reimbursements</dt><dd>@Money.Amount(n.ReimbursementTotal)</dd> }
+            @if (n.RoundOff != 0) { <dt>Round off</dt><dd>@(n.RoundOff > 0 ? "+" : "")@Money.Amount(n.RoundOff)</dd> }
+            <dt class="grand">Credit</dt><dd class="grand">@Money.Inr(n.GrandTotal)</dd>
+        </dl>
+    </section>
+
+    @if (n.IsComposition)
+    {
+        <p class="doc-statutory">Composition taxable person: no tax was charged on the original supply, so none is credited.</p>
+    }
+
+    <footer class="doc-foot">
+        <div class="doc-pay">
+            @if (!n.IsCancelled && (Model.Allocations.Any(a => a.IsActive) || Model.Refunds.Any(r => r.IsActive)))
+            {
+                <h3>Settled as</h3>
+                @foreach (var a in Model.Allocations.Where(a => a.IsActive))
+                {
+                    <p>@Money.Inr(a.Amount) against <span class="mono">@a.InvoiceNumber</span></p>
+                }
+                @foreach (var r in Model.Refunds.Where(r => r.IsActive))
+                {
+                    <p>@Money.Inr(r.Amount) refunded on @r.RefundDate.ToString("dd MMM yyyy") by @PaymentModes.Name(r.Mode)@(r.Reference is null ? "" : " " + r.Reference)</p>
+                }
+                @if (n.CreditLeft > 0) { <p class="strong">@Money.Inr(n.CreditLeft) held as your credit</p> }
+            }
+        </div>
+        <div class="doc-terms">
+            @if (n.Notes is not null) { <p class="pre">@n.Notes</p> }
+        </div>
+        <div class="doc-sign">
+            <p>For <strong>@(s?.LegalName)</strong></p>
+            @if (s?.SignaturePath is not null) { <img src="@FileStore.Url(s.SignaturePath)" alt="Signature" class="doc-signature" /> }
+            else { <span class="sign-space"></span> }
+            <p>@(s?.SignatoryName ?? "")</p>
+            <p class="muted">@(s?.SignatoryTitle ?? "Authorised signatory")</p>
+        </div>
+    </footer>
+    <p class="doc-generated">This is a computer-generated credit note.</p>
+</article>
+
+@if (Model.Refunds.Count > 0)
+{
+    <section class="card section no-print" id="refunds">
+        <header class="card-head"><h2>Refunds <span class="count">@Model.Refunds.Count(r => r.IsActive)</span></h2></header>
+        <ul class="item-list">
+            @foreach (var r in Model.Refunds)
+            {
+                <li class="@(r.IsActive ? null : "inactive")">
+                    <div class="item-main">
+                        <strong>@Money.Inr(r.Amount)</strong>
+                        <span class="sub">
+                            @r.RefundDate.ToString("d MMM yyyy") · @PaymentModes.Name(r.Mode)@(r.Reference is null ? "" : " " + r.Reference)@(r.BankName is null ? "" : $" · from {r.BankName} ••{r.BankAccountNumber?[^4..]}")
+                            @if (!r.IsActive) { <text>· undone: @r.UndoReason</text> }
+                        </span>
+                    </div>
+                    @if (r.IsActive && !n.IsCancelled && Model.CanManage)
+                    {
+                        <button type="button" class="btn small" data-dialog="undo" data-item='{"refundId":@r.CreditNoteRefundId}'>Undo</button>
+                    }
+                </li>
+            }
+        </ul>
+    </section>
+}
+
+@if (!n.IsCancelled && Model.CanManage)
+{
+    @if (n.CreditLeft > 0)
+    {
+        var rf = Model.Refund;
+        <dialog id="dlg-refund" class="dialog" aria-labelledby="dlg-refund-title" data-open="@(Model.OpenDialog == "refund" ? "true" : null)">
+            <form method="post" asp-page-handler="Refund" class="dialog-form" novalidate autocomplete="off">
+                <h2 id="dlg-refund-title">Refund to @n.BuyerName</h2>
+                <p class="muted">Money paid back out of this credit note. Up to @Money.Inr(n.CreditLeft) is left.</p>
+                @if (Model.OpenDialog == "refund" && Model.Error is not null) { <p class="notice danger">@Model.Error</p> }
+                <div class="fields two">
+                    <label class="field">
+                        <span>Amount (₹) <span class="req" aria-hidden="true">*</span></span>
+                        <input type="text" name="Refund.Amount" value="@rf.Amount?.ToString("0.##", CultureInfo.InvariantCulture)" data-default="@n.CreditLeft.ToString("0.##", CultureInfo.InvariantCulture)" inputmode="decimal" data-amount />
+                        @Html.ValidationMessage("Refund.Amount", new { @class = "field-error" })
+                    </label>
+                    <label class="field">
+                        <span>Paid on</span>
+                        <input type="date" name="Refund.RefundDate" value="@rf.RefundDate?.ToString("yyyy-MM-dd")" data-default="@Model.Today.ToString("yyyy-MM-dd")" min="@n.NoteDate.ToString("yyyy-MM-dd")" max="@Model.Today.ToString("yyyy-MM-dd")" />
+                        @Html.ValidationMessage("Refund.RefundDate", new { @class = "field-error" })
+                    </label>
+                    <label class="field">
+                        <span>How</span>
+                        <select name="Refund.Mode" data-default="@PaymentModes.BankTransfer">
+                            @foreach (var m in PaymentModes.All) { <option value="@m.Code" selected="@(rf.Mode == m.Code)">@m.Name</option> }
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>UTR / cheque no.</span>
+                        <input type="text" name="Refund.Reference" value="@rf.Reference" maxlength="60" class="mono" spellcheck="false" />
+                        @Html.ValidationMessage("Refund.Reference", new { @class = "field-error" })
+                    </label>
+                    @if (Model.Accounts.Count > 0)
+                    {
+                        var defaultAccount = Model.Accounts.FirstOrDefault(a => a.IsDefault) ?? Model.Accounts[0];
+                        <label class="field span-2">
+                            <span>From account</span>
+                            <select name="Refund.BankAccountId" data-default="@defaultAccount.BankAccountId">
+                                @foreach (var a in Model.Accounts) { <option value="@a.BankAccountId" selected="@(rf.BankAccountId == a.BankAccountId)">@a.BankName @a.Masked</option> }
+                            </select>
+                        </label>
+                    }
+                    <label class="field span-2"><span>Note</span><input type="text" name="Refund.Notes" value="@rf.Notes" maxlength="500" /></label>
+                </div>
+                <footer class="dialog-actions">
+                    <button type="button" class="btn" data-close>Close <kbd>Esc</kbd></button>
+                    <button type="submit" class="btn primary">Record refund <kbd>Ctrl Enter</kbd></button>
+                </footer>
+            </form>
+        </dialog>
+    }
+
+    <dialog id="dlg-undo" class="dialog" aria-labelledby="dlg-undo-title" data-open="@(Model.OpenDialog?.StartsWith("undo-") == true ? "true" : null)">
+        <form method="post" asp-page-handler="UndoRefund" class="dialog-form" novalidate>
+            <h2 id="dlg-undo-title">Undo this refund?</h2>
+            <p class="muted">For a refund recorded by mistake, or one the bank sent back. The amount becomes the customer's credit again.</p>
+            @if (Model.OpenDialog?.StartsWith("undo-") == true && Model.Error is not null) { <p class="notice danger">@Model.Error</p> }
+            <input type="hidden" name="refundId" value="@(Model.OpenDialog?.StartsWith("undo-") == true ? Model.OpenDialog[5..] : "0")" />
+            <label class="field">
+                <span>Reason <span class="req" aria-hidden="true">*</span></span>
+                <input type="text" name="reason" maxlength="200" required placeholder="Returned by the bank" />
+            </label>
+            <footer class="dialog-actions">
+                <button type="button" class="btn" data-close>Keep it <kbd>Esc</kbd></button>
+                <button type="submit" class="btn danger">Undo refund</button>
+            </footer>
+        </form>
+    </dialog>
+
+    <dialog id="dlg-cancel" class="dialog" aria-labelledby="dlg-cancel-title" data-open="@(Model.OpenDialog == "cancel" ? "true" : null)">
+        <form method="post" asp-page-handler="Cancel" class="dialog-form" novalidate>
+            <h2 id="dlg-cancel-title">Cancel @n.NoteNumber?</h2>
+            <p class="muted">Only for a credit note issued by mistake. What it took off @n.InvoiceNumber@(Model.Allocations.Count(a => a.IsActive) > 1 ? " and other invoices" : "") is owed again. The number stays in the register, marked cancelled. If it was already reported in GSTR-1, report the cancellation too.</p>
+            @if (Model.OpenDialog == "cancel" && Model.Error is not null) { <p class="notice danger">@Model.Error</p> }
+            <input type="hidden" name="Cancel.Id" value="@n.CreditNoteId" />
+            <label class="field">
+                <span>Reason <span class="req" aria-hidden="true">*</span></span>
+                <input type="text" name="reason" maxlength="200" required placeholder="Issued against the wrong invoice" />
+            </label>
+            <footer class="dialog-actions">
+                <button type="button" class="btn" data-close>Keep it <kbd>Esc</kbd></button>
+                <button type="submit" class="btn danger">Cancel credit note</button>
+            </footer>
+        </form>
+    </dialog>
+}
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+    <script src="~/js/form.js" asp-append-version="true"></script>
+    <script src="~/js/dialogs.js" asp-append-version="true"></script>
+    <script src="~/js/invoice-view.js" asp-append-version="true"></script>
+}

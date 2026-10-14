@@ -24,6 +24,7 @@
                 @(i.InvoiceNumber ?? "Draft")
                 @if (i.IsDraft) { <span class="badge">Draft</span> }
                 else if (i.IsCancelled) { <span class="badge warn">Cancelled</span> }
+                else if (i.Balance <= 0 && i.CreditedAmount >= i.GrandTotal) { <span class="badge">Credited in full</span> }
                 else if (i.Balance <= 0) { <span class="badge success">Paid</span> }
                 else if (i.DueDate is { } due && due.Date < When.TodayIst()) { <span class="badge warn">Overdue</span> }
                 else { <span class="badge">Unpaid</span> }
@@ -53,6 +54,10 @@
                     <a class="btn primary" href="/Sales/Payments/Record?invoiceId=@i.SalesInvoiceId" data-key="r"><span class="ms" aria-hidden="true">price_check</span>Record payment <kbd>R</kbd></a>
                 }
                 <a class="btn" href="/Sales/Invoices/Edit?copy=@i.SalesInvoiceId" data-key="d" title="A new draft with the same customer and lines, dated today"><span class="ms" aria-hidden="true">content_copy</span>Repeat <kbd>D</kbd></a>
+            }
+            @if (i.IsIssued && Model.CanCreditNote && Model.CreditNotes.Where(c => c.IsActive).Sum(c => c.GrandTotal) < i.GrandTotal)
+            {
+                <a class="btn" href="/Sales/CreditNotes/New?invoiceId=@i.SalesInvoiceId" data-key="n" title="Goods returned, a discount after the sale, or charged too much"><span class="ms" aria-hidden="true">assignment_return</span>Credit note <kbd>N</kbd></a>
             }
             @if (i.IsIssued && Model.CanCancel)
             {
@@ -195,8 +200,9 @@
             <dt class="grand">Total</dt><dd class="grand">@Money.Inr(i.GrandTotal)</dd>
             @if (i.AmountPaid > 0)
             {
-                <dt>Received</dt><dd>@Money.Amount(i.AmountPaid - i.TdsDeducted)</dd>
+                if (i.Received != 0) { <dt>Received</dt><dd>@Money.Amount(i.Received)</dd> }
                 if (i.TdsDeducted > 0) { <dt>TDS deducted</dt><dd>@Money.Amount(i.TdsDeducted)</dd> }
+                if (i.CreditedAmount > 0) { <dt>Credit notes</dt><dd>@Money.Amount(i.CreditedAmount)</dd> }
                 <dt class="strong">Balance due</dt><dd class="strong">@Money.Inr(i.Balance)</dd>
             }
         </dl>
@@ -260,6 +266,29 @@
                         </span>
                     </div>
                     <span class="num">@Money.Inr(pay.Amount)@if (pay.TdsAmount > 0) { <span class="sub">+ @Money.Inr(pay.TdsAmount) TDS</span> }</span>
+                </li>
+            }
+        </ul>
+    </section>
+}
+
+@if (Model.CreditNotes.Count > 0)
+{
+    <section class="card section no-print" id="credit-notes">
+        <header class="card-head"><h2>Credit notes <span class="count">@Model.CreditNotes.Count(x => x.IsActive)</span></h2></header>
+        <ul class="item-list">
+            @foreach (var cn in Model.CreditNotes)
+            {
+                <li class="@(cn.IsActive ? null : "inactive")">
+                    <div class="item-main">
+                        <a href="/Sales/CreditNotes/View/@cn.CreditNoteId" class="mono"><strong>@cn.NoteNumber</strong></a>
+                        <span class="sub">
+                            @cn.NoteDate.ToString("d MMM yyyy") · @BillingMadeEasy.Core.Billing.CreditNoteReasons.Name(cn.ReasonCode)@(cn.ReasonText is null ? "" : ": " + cn.ReasonText)
+                            @if (!cn.IsActive) { <text>· cancelled: @cn.CancelReason</text> }
+                            else if (cn.CreditLeft > 0) { <text>· @Money.Inr(cn.CreditLeft) credit left</text> }
+                        </span>
+                    </div>
+                    <span class="num">@Money.Inr(cn.GrandTotal)</span>
                 </li>
             }
         </ul>

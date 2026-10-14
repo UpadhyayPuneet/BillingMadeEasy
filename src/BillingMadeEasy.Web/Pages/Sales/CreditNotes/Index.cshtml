@@ -1,0 +1,48 @@
+@page
+@model BillingMadeEasy.Web.Pages.Sales.CreditNotes.IndexModel
+@using BillingMadeEasy.Web.Infrastructure.Formatting
+@{
+    ViewData["Title"] = "Credit notes";
+    var s = Model.Result.Summary;
+}
+<header class="page-head">
+    <div>
+        <h1>Credit notes</h1>
+        <p class="muted">Returns, discounts after the sale and over-billing, taken back with their GST. Start one from the invoice it corrects.</p>
+    </div>
+    <a class="btn" href="/Sales/Invoices" data-key="v"><span class="ms" aria-hidden="true">receipt_long</span>Invoices <kbd>V</kbd></a>
+</header>
+
+@if (Model.Flash is not null) { <div class="notice" role="status">@Model.Flash</div> }
+
+<section class="stat-strip" aria-label="Summary">
+    <div class="stat-tile"><span class="stat-label">Credited this month</span><span class="stat-value">@Money.Inr(s.CreditedThisMonth)</span><span class="sub">@s.NotesThisMonth @(s.NotesThisMonth == 1 ? "note" : "notes")</span></div>
+    <div class="stat-tile"><span class="stat-label">GST reduced this month</span><span class="stat-value">@Money.Inr(s.TaxThisMonth)</span><span class="sub">reported in GSTR-1, lowers GSTR-3B</span></div>
+    <a class="stat-tile" href="@Model.Link("open")"><span class="stat-label">Customer credit held</span><span class="stat-value">@Money.Inr(s.OpenCredit)</span><span class="sub">to apply to invoices or refund</span></a>
+</section>
+
+<div class="toolbar">
+    <nav class="segments" aria-label="Show">
+        @foreach (var (key, label) in new[] { ("all", "All"), ("open", "With credit left"), ("cancelled", "Cancelled") })
+        {
+            <a href="@Model.Link(key)" aria-current="@(Model.CurrentView == key ? "page" : null)">@label</a>
+        }
+    </nav>
+</div>
+
+<form method="get" class="search-row" data-live-search="/Sales/CreditNotes?handler=Rows" role="search">
+    @if (Model.CurrentView != "all") { <input type="hidden" name="view" value="@Model.CurrentView" /> }
+    <label class="search-field">
+        <span class="ms" aria-hidden="true">search</span>
+        <input type="search" name="q" value="@Model.Q" placeholder="Search credit notes" autocomplete="off" spellcheck="false" autofocus aria-label="Search" />
+        <kbd>↓</kbd>
+    </label>
+</form>
+
+<div data-live-results>
+    <partial name="_CreditNoteRows" model="Model" />
+</div>
+
+@section Scripts {
+    <script src="~/js/list.js" asp-append-version="true"></script>
+}

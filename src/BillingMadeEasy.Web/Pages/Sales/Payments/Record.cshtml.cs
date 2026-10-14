@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BillingMadeEasy.Web.Pages.Sales.Payments;
 
-public sealed class RecordModel(PaymentStore payments, PartyStore parties, BusinessStore business, InvoiceStore invoices) : TenantPageModel
+public sealed class RecordModel(PaymentStore payments, PartyStore parties, BusinessStore business, InvoiceStore invoices, CreditNoteStore creditNotes) : TenantPageModel
 {
     public sealed class PaymentForm
     {
@@ -41,6 +41,8 @@ public sealed class RecordModel(PaymentStore payments, PartyStore parties, Busin
     [BindProperty(SupportsGet = true)] public long? InvoiceId { get; set; }
     public IReadOnlyList<OpenInvoice> Open { get; private set; } = [];
     public IReadOnlyList<Advance> Advances { get; private set; } = [];
+    /// <summary>Credit notes with credit left: the customer may be paying less because of them.</summary>
+    public IReadOnlyList<OpenCredit> Credits { get; private set; } = [];
     public IReadOnlyList<BankAccount> Accounts { get; private set; } = [];
     public DateOnly Today => DateOnly.FromDateTime(When.TodayIst());
 
@@ -112,6 +114,7 @@ public sealed class RecordModel(PaymentStore payments, PartyStore parties, Busin
     public async Task<IActionResult> OnGetOpenAsync(long partyId, CancellationToken ct)
     {
         var (open, advances) = await payments.OpenAsync(TenantId, partyId, Today, ct);
+        var credits = Can("Sales.CreditNote.View") ? await creditNotes.OpenForPartyAsync(TenantId, partyId, ct) : [];
         return new JsonResult(new
         {
             invoices = open.Select(o => new
@@ -121,6 +124,8 @@ public sealed class RecordModel(PaymentStore payments, PartyStore parties, Busin
             }),
             advance = advances.Sum(a => a.Unapplied),
             advanceReceipts = advances.Select(a => a.ReceiptNumber),
+            credit = credits.Sum(c => c.CreditLeft),
+            creditNotes = credits.Select(c => c.NoteNumber),
         });
     }
 
@@ -138,6 +143,7 @@ public sealed class RecordModel(PaymentStore payments, PartyStore parties, Busin
         {
             if (await parties.GetAsync(TenantId, pid, ct) is { } party) CustomerLabel = party.Party.DisplayName;
             (Open, Advances) = await payments.OpenAsync(TenantId, pid, Today, ct);
+            if (Can("Sales.CreditNote.View")) Credits = await creditNotes.OpenForPartyAsync(TenantId, pid, ct);
         }
         else CustomerLabel ??= Form.PayerName;
 
