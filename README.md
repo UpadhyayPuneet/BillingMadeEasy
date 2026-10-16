@@ -5,6 +5,7 @@ used from the keyboard.
 
 - **Scope and roadmap:** [docs/SCOPE.md](docs/SCOPE.md)
 - **Moving from Web Forms:** [docs/MIGRATION.md](docs/MIGRATION.md)
+- **Handover / current state:** [docs/HANDOVER.md](docs/HANDOVER.md)
 
 ## Run it
 

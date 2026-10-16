@@ -3,6 +3,7 @@
 Multi-tenant billing/inventory/accounting SaaS for Indian SMBs. ASP.NET Core 10 (Razor Pages +
 Minimal APIs), SQL Server via stored procedures, Dapper. Being ported from an ASP.NET Web Forms
 app that shares the same database. Product scope: `docs/SCOPE.md`. Port plan: `docs/MIGRATION.md`.
+**Start here in a new session: `docs/HANDOVER.md`** (state of the work, how to run, next steps).
 
 ## Commands
 
